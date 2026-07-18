@@ -1,0 +1,8 @@
+{
+  "isaac_lab": {
+    "url": "https://github.com/isaac-sim/IsaacLab.git",
+    "commit": "b4c321024792976150ca55fddb26fa34480d974e"
+  },
+  "tested_isaac_sim": "5.1.0-rc.19",
+  "note": "Isaac Sim binaries are installed separately and are never vendored here."
+}

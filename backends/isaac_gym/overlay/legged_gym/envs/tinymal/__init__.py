@@ -1,0 +1,1 @@
+"""TinyMal locomotion task configuration."""

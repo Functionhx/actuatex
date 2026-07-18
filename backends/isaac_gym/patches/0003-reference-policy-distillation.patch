@@ -1,0 +1,89 @@
+--- a/rsl_rl/algorithms/ppo.py
++++ b/rsl_rl/algorithms/ppo.py
+@@ -78,6 +78,18 @@
+         self.max_grad_norm = max_grad_norm
+         self.use_clipped_value_loss = use_clipped_value_loss
+
++        # Optional task-selective policy distillation.  Training scripts may
++        # attach a frozen actor and a boolean observation mask.  Keeping this
++        # disabled by default preserves the upstream PPO behavior exactly.
++        self.reference_actor = None
++        self.reference_loss_coef = 0.0
++        self.reference_mask_fn = None
++        self.last_reference_loss = 0.0
++        self.secondary_reference_actor = None
++        self.secondary_reference_loss_coef = 0.0
++        self.secondary_reference_mask_fn = None
++        self.last_secondary_reference_loss = 0.0
++
+     def init_storage(self, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, action_shape):
+         self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, action_shape, self.device)
+
+@@ -120,6 +132,8 @@
+     def update(self):
+         mean_value_loss = 0
+         mean_surrogate_loss = 0
++        mean_reference_loss = 0
++        mean_secondary_reference_loss = 0
+         if self.actor_critic.is_recurrent:
+             generator = self.storage.reccurent_mini_batch_generator(self.num_mini_batches, self.num_learning_epochs)
+         else:
+@@ -168,7 +182,40 @@
+                 else:
+                     value_loss = (returns_batch - value_batch).pow(2).mean()
+
+-                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
++                reference_loss = torch.zeros((), device=self.device)
++                if self.reference_actor is not None and self.reference_loss_coef > 0.0:
++                    reference_mask = self.reference_mask_fn(obs_batch)
++                    if bool(reference_mask.any()):
++                        with torch.no_grad():
++                            reference_actions = self.reference_actor(obs_batch)
++                        reference_loss = torch.square(
++                            mu_batch[reference_mask] - reference_actions[reference_mask]
++                        ).mean()
++
++                secondary_reference_loss = torch.zeros((), device=self.device)
++                if (
++                    self.secondary_reference_actor is not None
++                    and self.secondary_reference_loss_coef > 0.0
++                ):
++                    secondary_reference_mask = self.secondary_reference_mask_fn(obs_batch)
++                    if bool(secondary_reference_mask.any()):
++                        with torch.no_grad():
++                            secondary_reference_actions = self.secondary_reference_actor(
++                                obs_batch
++                            )
++                        secondary_reference_loss = torch.square(
++                            mu_batch[secondary_reference_mask]
++                            - secondary_reference_actions[secondary_reference_mask]
++                        ).mean()
++
++                loss = (
++                    surrogate_loss
++                    + self.value_loss_coef * value_loss
++                    - self.entropy_coef * entropy_batch.mean()
++                    + self.reference_loss_coef * reference_loss
++                    + self.secondary_reference_loss_coef
++                    * secondary_reference_loss
++                )
+
+                 # Gradient step
+                 self.optimizer.zero_grad()
+@@ -178,10 +225,16 @@
+
+                 mean_value_loss += value_loss.item()
+                 mean_surrogate_loss += surrogate_loss.item()
++                mean_reference_loss += reference_loss.item()
++                mean_secondary_reference_loss += secondary_reference_loss.item()
+
+         num_updates = self.num_learning_epochs * self.num_mini_batches
+         mean_value_loss /= num_updates
+         mean_surrogate_loss /= num_updates
++        self.last_reference_loss = mean_reference_loss / num_updates
++        self.last_secondary_reference_loss = (
++            mean_secondary_reference_loss / num_updates
++        )
+         self.storage.clear()
+
+         return mean_value_loss, mean_surrogate_loss

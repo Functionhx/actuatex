@@ -1,0 +1,16 @@
+{
+  "unitree_rl_gym": {
+    "url": "https://github.com/unitreerobotics/unitree_rl_gym.git",
+    "commit": "276801e46c5d433564f24658bac64f254b7d2d4b",
+    "package_version": "1.0.0"
+  },
+  "rsl_rl": {
+    "url": "https://github.com/leggedrobotics/rsl_rl.git",
+    "tag": "v1.0.2",
+    "commit": "2ad79cf0caa85b91721abfe358105f869a784121"
+  },
+  "isaac_gym": {
+    "distribution": "NVIDIA Isaac Gym Preview 4",
+    "note": "Download separately under NVIDIA's license; it is never vendored here."
+  }
+}

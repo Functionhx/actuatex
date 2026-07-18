@@ -1,0 +1,26 @@
+--- a/legged_gym/envs/base/base_task.py
++++ b/legged_gym/envs/base/base_task.py
+@@ -23,9 +23,14 @@
+         else:
+             self.device = 'cpu'
+
+-        # graphics device for rendering, -1 for no rendering
++        # Graphics device for rendering.  Headless evaluation normally disables
++        # graphics, but camera-only recording still needs an off-screen graphics
++        # context and must not create an interactive viewer.
+         self.graphics_device_id = self.sim_device_id
+-        if self.headless == True:
++        self.enable_offscreen_rendering = bool(
++            getattr(cfg.env, "enable_offscreen_rendering", False)
++        )
++        if self.headless == True and not self.enable_offscreen_rendering:
+             self.graphics_device_id = -1
+
+         self.num_envs = cfg.env.num_envs
+@@ -112,4 +117,4 @@
+                 if sync_frame_time:
+                     self.gym.sync_frame_time(self.sim)
+             else:
+-                self.gym.poll_viewer_events(self.viewer)
+\ 文件末尾没有换行符
++                self.gym.poll_viewer_events(self.viewer)

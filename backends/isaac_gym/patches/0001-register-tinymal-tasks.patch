@@ -1,0 +1,59 @@
+--- a/legged_gym/envs/__init__.py
++++ b/legged_gym/envs/__init__.py
+@@ -7,6 +7,32 @@
+ from legged_gym.envs.h1_2.h1_2_env import H1_2Robot
+ from legged_gym.envs.g1.g1_config import G1RoughCfg, G1RoughCfgPPO
+ from legged_gym.envs.g1.g1_env import G1Robot
++from legged_gym.envs.tinymal.tinymal_config import TinyMalCfg, TinyMalCfgPPO
++from legged_gym.envs.tinymal.tinymal_push import TinyMalPush
++from legged_gym.envs.tinymal.tinymal_push_config import (
++    TinyMalPushCfg,
++    TinyMalPushCfgPPO,
++)
++from legged_gym.envs.tinymal.tinymal_stairs import TinyMalStairs
++from legged_gym.envs.tinymal.tinymal_stairs_config import (
++    TinyMalStairsCfg,
++    TinyMalStairsCfgPPO,
++)
++from legged_gym.envs.tinymal.tinymal_robust import TinyMalRobust
++from legged_gym.envs.tinymal.tinymal_robust_config import (
++    TinyMalRobustCfg,
++    TinyMalRobustCfgPPO,
++)
++from legged_gym.envs.tinymal.tinymal_robust_stairs import TinyMalRobustStairs
++from legged_gym.envs.tinymal.tinymal_robust_stairs_config import (
++    TinyMalRobustStairsCfg,
++    TinyMalRobustStairsCfgPPO,
++)
++from legged_gym.envs.tinymal.tinymal_robust_mixed import TinyMalRobustMixed
++from legged_gym.envs.tinymal.tinymal_robust_mixed_config import (
++    TinyMalRobustMixedCfg,
++    TinyMalRobustMixedCfgPPO,
++)
+ from .base.legged_robot import LeggedRobot
+
+ from legged_gym.utils.task_registry import task_registry
+@@ -15,3 +41,23 @@
+ task_registry.register( "h1", H1Robot, H1RoughCfg(), H1RoughCfgPPO())
+ task_registry.register( "h1_2", H1_2Robot, H1_2RoughCfg(), H1_2RoughCfgPPO())
+ task_registry.register( "g1", G1Robot, G1RoughCfg(), G1RoughCfgPPO())
++task_registry.register("tinymal", LeggedRobot, TinyMalCfg(), TinyMalCfgPPO())
++task_registry.register("tinymal_push", TinyMalPush, TinyMalPushCfg(), TinyMalPushCfgPPO())
++task_registry.register(
++    "tinymal_stairs", TinyMalStairs, TinyMalStairsCfg(), TinyMalStairsCfgPPO()
++)
++task_registry.register(
++    "tinymal_robust", TinyMalRobust, TinyMalRobustCfg(), TinyMalRobustCfgPPO()
++)
++task_registry.register(
++    "tinymal_robust_stairs",
++    TinyMalRobustStairs,
++    TinyMalRobustStairsCfg(),
++    TinyMalRobustStairsCfgPPO(),
++)
++task_registry.register(
++    "tinymal_robust_mixed",
++    TinyMalRobustMixed,
++    TinyMalRobustMixedCfg(),
++    TinyMalRobustMixedCfgPPO(),
++)

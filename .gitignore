@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local dependency checkouts and simulator runtimes
+_deps/
+IsaacLab/
+isaacsim/
+unitree_rl_gym/
+rsl_rl/
+
+# Training and evaluation artifacts
+artifacts/
+logs/
+runs/
+/checkpoints/
+evaluation/
+videos/
+wandb/
+*.tfevents.*
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.engine
+*.mp4
+*.avi
+
+# Generated simulator files
+*.usd
+*.usda
+*.usdc
+compiled_*.mjcf
+
+# Archives and local release packages
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

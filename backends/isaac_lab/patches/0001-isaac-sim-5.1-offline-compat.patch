@@ -1,0 +1,109 @@
+diff --git a/source/isaaclab/isaaclab/sim/converters/urdf_converter.py b/source/isaaclab/isaaclab/sim/converters/urdf_converter.py
+index ba80f52..a2c3f79 100644
+--- a/source/isaaclab/isaaclab/sim/converters/urdf_converter.py
++++ b/source/isaaclab/isaaclab/sim/converters/urdf_converter.py
+@@ -140,7 +140,11 @@ class UrdfConverter(AssetConverterBase):
+         import_config.set_collision_from_visuals(self.cfg.collision_from_visuals)
+         # consolidating links that are connected by fixed joints
+         import_config.set_merge_fixed_joints(self.cfg.merge_fixed_joints)
+-        import_config.set_merge_fixed_ignore_inertia(self.cfg.merge_fixed_joints)
++        # NOTE(merged for source Isaac Sim 5.1.0-rc.19): set_merge_fixed_ignore_inertia is
++        # absent in the rc.19 urdf importer ext (v2.4.30). It only matters when merging fixed
++        # joints; guard it so the converter works across Isaac Sim patch versions.
++        if hasattr(import_config, "set_merge_fixed_ignore_inertia"):
++            import_config.set_merge_fixed_ignore_inertia(self.cfg.merge_fixed_joints)
+         # -- physics settings
+         # create fix joint for base link
+         import_config.set_fix_base(self.cfg.fix_base)
+diff --git a/source/isaaclab/isaaclab/sim/spawners/from_files/from_files.py b/source/isaaclab/isaaclab/sim/spawners/from_files/from_files.py
+index 242829d..1bd99a0 100644
+--- a/source/isaaclab/isaaclab/sim/spawners/from_files/from_files.py
++++ b/source/isaaclab/isaaclab/sim/spawners/from_files/from_files.py
+@@ -199,19 +199,44 @@ def spawn_ground_plane(
+
+     # Spawn Ground-plane
+     if not stage.GetPrimAtPath(prim_path).IsValid():
+-        create_prim(prim_path, usd_path=cfg.usd_path, translation=translation, orientation=orientation, stage=stage)
++        import os as _os
++        _usd = str(cfg.usd_path)
++        _usd_ok = bool(_usd) and not _usd.startswith("None") and (
++            _usd.startswith("http") or _os.path.exists(_usd)
++        )
++        if _usd_ok:
++            create_prim(prim_path, usd_path=cfg.usd_path, translation=translation, orientation=orientation, stage=stage)
++            _ground_kind = "plane"
++        else:
++            # NOTE(source Isaac Sim 5.1.0-rc.19 fallback): no Nucleus server is running, so
++            # the default grid-plane USD is unreachable. Spawn a large thin cuboid instead so
++            # flat-ground tasks work fully offline. The box is 2 km wide -> effectively infinite
++            # for indoor-scale locomotion, and stays a single convex -> cheap.
++            import isaaclab.sim as _su
++            _ground_cfg = _su.CuboidCfg(
++                size=(2000.0, 2000.0, 1.0),
++                collision_props=_su.CollisionPropertiesCfg(collision_enabled=True),
++                visual_material=_su.PreviewSurfaceCfg(diffuse_color=(0.25, 0.25, 0.25)),
++            )
++            _ground_cfg.func(prim_path, _ground_cfg, translation=(0.0, 0.0, -0.5))
++            _ground_kind = "cuboid"
+     else:
+         raise ValueError(f"A prim already exists at path: '{prim_path}'.")
+
+     # Create physics material
+     if cfg.physics_material is not None:
+         cfg.physics_material.func(f"{prim_path}/physicsMaterial", cfg.physics_material)
+-        # Apply physics material to ground plane
+-        collision_prim = get_first_matching_child_prim(
+-            prim_path,
+-            predicate=lambda _prim: _prim.GetTypeName() == "Plane",
+-            stage=stage,
+-        )
++        # Apply physics material to ground plane collision prim.
++        # Original grid asset exposes a "Plane"-typed child; the offline cuboid fallback
++        # exposes a "Cube"-typed child. Pick whichever exists.
++        _types = ("Plane",) if _ground_kind == "plane" else ("Cube", "Mesh", "Plane")
++        collision_prim = None
++        for _t in _types:
++            collision_prim = get_first_matching_child_prim(
++                prim_path, predicate=lambda _prim, _tt=_t: _prim.GetTypeName() == _tt, stage=stage
++            )
++            if collision_prim is not None:
++                break
+         if collision_prim is None:
+             raise ValueError(f"No collision prim found at path: '{prim_path}'.")
+         # bind physics material to the collision prim
+@@ -228,19 +253,22 @@ def spawn_ground_plane(
+         # apply scale to the mesh
+         environment_prim.GetAttribute("xformOp:scale").Set(scale)
+
+-    # Change the color of the plane
+-    # Warning: This is specific to the default grid plane asset.
+-    if cfg.color is not None:
+-        # change the color
+-        change_prim_property(
+-            prop_path=f"{prim_path}/Looks/theGrid/Shader.inputs:diffuse_tint",
+-            value=Gf.Vec3f(*cfg.color),
+-            stage=stage,
+-            type_to_create_if_not_exist=Sdf.ValueTypeNames.Color3f,
+-        )
+-    # Remove the light from the ground plane
+-    # It isn't bright enough and messes up with the user's lighting settings
+-    omni.kit.commands.execute("ToggleVisibilitySelectedPrims", selected_paths=[f"{prim_path}/SphereLight"], stage=stage)
++    # The remaining color/light edits are specific to the default Nucleus grid asset
++    # and only make sense for the USD-backed plane, not the offline cuboid fallback.
++    if _ground_kind == "plane":
++        # Change the color of the plane
++        # Warning: This is specific to the default grid plane asset.
++        if cfg.color is not None:
++            # change the color
++            change_prim_property(
++                prop_path=f"{prim_path}/Looks/theGrid/Shader.inputs:diffuse_tint",
++                value=Gf.Vec3f(*cfg.color),
++                stage=stage,
++                type_to_create_if_not_exist=Sdf.ValueTypeNames.Color3f,
++            )
++        # Remove the light from the ground plane
++        # It isn't bright enough and messes up with the user's lighting settings
++        omni.kit.commands.execute("ToggleVisibilitySelectedPrims", selected_paths=[f"{prim_path}/SphereLight"], stage=stage)
+
+     prim = stage.GetPrimAtPath(prim_path)
+     # Apply semantic tags

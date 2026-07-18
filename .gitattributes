@@ -1,0 +1,8 @@
+*.STL binary
+*.png binary
+*.pdf binary
+*.patch text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.urdf text eol=lf
