@@ -20,6 +20,7 @@ from sentinel_env import MjSentinelEnv  # noqa: E402
 from tasks.inverted_pendulum.off_policy_rl import (  # noqa: E402
     OffPolicyConfig,
     ReplayBuffer,
+    ReplayRatioScheduler,
     create_agent,
 )
 from tasks.robomaster.contract import ACTION_DIM, contract_sha256  # noqa: E402
@@ -35,7 +36,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--learning-starts", type=int, default=50_000)
     parser.add_argument("--replay-capacity", type=int, default=1_000_000)
     parser.add_argument("--batch-size", type=int, default=512)
-    parser.add_argument("--updates-per-step", type=int, default=2)
+    parser.add_argument(
+        "--replay-sample-ratio",
+        type=float,
+        default=4.0,
+        help=(
+            "sampled replay rows per newly collected transition; converted to a "
+            "fractional-safe gradient-update schedule"
+        ),
+    )
+    parser.add_argument(
+        "--updates-per-step",
+        type=int,
+        default=None,
+        help=(
+            "legacy fixed updates per vector-environment step; overrides the "
+            "backend-independent replay sample ratio"
+        ),
+    )
     parser.add_argument("--exploration-noise", type=float, default=0.10)
     parser.add_argument("--maximum-command-delay-steps", type=int, default=0)
     parser.add_argument("--seed", type=int, default=1001)
@@ -57,11 +75,14 @@ def main() -> None:
         args.total_transitions,
         args.replay_capacity,
         args.batch_size,
-        args.updates_per_step,
         args.log_interval_steps,
     )
     if any(value <= 0 for value in positive):
         raise ValueError("environment, replay, update and logging sizes must be positive")
+    if args.replay_sample_ratio <= 0.0:
+        raise ValueError("replay sample ratio must be positive")
+    if args.updates_per_step is not None and args.updates_per_step <= 0:
+        raise ValueError("updates per step must be positive when set")
     if args.learning_starts < 0 or args.maximum_command_delay_steps < 0:
         raise ValueError("learning starts and command delay must be non-negative")
     if args.exploration_noise < 0.0:
@@ -86,6 +107,16 @@ def main() -> None:
         args.replay_capacity,
         device,
     )
+    update_scheduler = ReplayRatioScheduler(
+        batch_size=args.batch_size,
+        replay_sample_ratio=args.replay_sample_ratio,
+        updates_per_vector_step=args.updates_per_step,
+    )
+    if args.updates_per_step is not None:
+        print(
+            "[WARN] --updates-per-step uses backend-dependent legacy scheduling; "
+            "prefer --replay-sample-ratio for comparisons"
+        )
     env = MjSentinelEnv(
         num_envs=args.num_envs,
         num_threads=args.num_threads,
@@ -101,6 +132,7 @@ def main() -> None:
     start = time.perf_counter()
     try:
         while collected_transitions < args.total_transitions:
+            transitions_before_step = collected_transitions
             transition_observation = observation.clone()
             if collected_transitions < args.learning_starts:
                 action = torch.empty(
@@ -133,7 +165,14 @@ def main() -> None:
                 collected_transitions >= args.learning_starts
                 and replay.size >= args.batch_size
             ):
-                for _ in range(args.updates_per_step):
+                eligible_new_transitions = collected_transitions - max(
+                    transitions_before_step,
+                    args.learning_starts,
+                )
+                updates_this_step = update_scheduler.updates_for(
+                    eligible_new_transitions
+                )
+                for _ in range(updates_this_step):
                     last_metrics = agent.update(replay, args.batch_size)
                     gradient_updates += 1
             if environment_steps % args.log_interval_steps == 0:
@@ -147,6 +186,7 @@ def main() -> None:
                 print(
                     f"step={environment_steps} transitions={collected_transitions:,} "
                     f"replay={replay.size:,} updates={gradient_updates:,} "
+                    f"sample_ratio={update_scheduler.achieved_ratio:.3f} "
                     f"reward={mean_reward:.4f} throughput={throughput:,.0f}/s "
                     f"{metric_text}"
                 )
@@ -175,6 +215,15 @@ def main() -> None:
         "collected_transitions": collected_transitions,
         "environment_steps": environment_steps,
         "gradient_updates": gradient_updates,
+        "batch_size": args.batch_size,
+        "replay_sample_ratio_target": (
+            None if args.updates_per_step is not None else args.replay_sample_ratio
+        ),
+        "updates_per_vector_step_override": args.updates_per_step,
+        "eligible_training_transitions": update_scheduler.eligible_transitions,
+        "replay_sample_ratio_achieved": update_scheduler.achieved_ratio,
+        "gradient_updates_per_transition": gradient_updates
+        / max(1, update_scheduler.eligible_transitions),
         "wall_time_s": elapsed,
         "transitions_per_second": collected_transitions / max(elapsed, 1.0e-9),
         "maximum_command_delay_steps": args.maximum_command_delay_steps,

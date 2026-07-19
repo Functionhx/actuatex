@@ -24,7 +24,24 @@ parser.add_argument("--total_transitions", type=int, default=5_000_000)
 parser.add_argument("--learning_starts", type=int, default=100_000)
 parser.add_argument("--replay_capacity", type=int, default=2_000_000)
 parser.add_argument("--batch_size", type=int, default=1024)
-parser.add_argument("--updates_per_step", type=int, default=4)
+parser.add_argument(
+    "--replay_sample_ratio",
+    type=float,
+    default=4.0,
+    help=(
+        "sampled replay rows per newly collected transition; converted to a "
+        "fractional-safe gradient-update schedule"
+    ),
+)
+parser.add_argument(
+    "--updates_per_step",
+    type=int,
+    default=None,
+    help=(
+        "legacy fixed updates per vector-environment step; overrides the "
+        "backend-independent replay sample ratio"
+    ),
+)
 parser.add_argument("--exploration_noise", type=float, default=0.10)
 parser.add_argument("--seed", type=int, default=1101)
 parser.add_argument("--log_interval_steps", type=int, default=50)
@@ -48,6 +65,7 @@ from isaaclab_tasks.utils import parse_env_cfg  # noqa: E402
 from tasks.inverted_pendulum.off_policy_rl import (  # noqa: E402
     OffPolicyConfig,
     ReplayBuffer,
+    ReplayRatioScheduler,
     create_agent,
 )
 from tasks.robomaster.contract import ACTION_DIM, contract_sha256  # noqa: E402
@@ -60,11 +78,14 @@ def main() -> None:
         args_cli.total_transitions,
         args_cli.replay_capacity,
         args_cli.batch_size,
-        args_cli.updates_per_step,
         args_cli.log_interval_steps,
     )
     if any(value <= 0 for value in positive):
         raise ValueError("environment, replay, update and logging sizes must be positive")
+    if args_cli.replay_sample_ratio <= 0.0:
+        raise ValueError("replay_sample_ratio must be positive")
+    if args_cli.updates_per_step is not None and args_cli.updates_per_step <= 0:
+        raise ValueError("updates_per_step must be positive when set")
     if args_cli.learning_starts < 0:
         raise ValueError("learning_starts cannot be negative")
     if args_cli.exploration_noise < 0.0:
@@ -101,6 +122,16 @@ def main() -> None:
         args_cli.replay_capacity,
         device,
     )
+    update_scheduler = ReplayRatioScheduler(
+        batch_size=args_cli.batch_size,
+        replay_sample_ratio=args_cli.replay_sample_ratio,
+        updates_per_vector_step=args_cli.updates_per_step,
+    )
+    if args_cli.updates_per_step is not None:
+        print(
+            "[WARN] --updates_per_step uses backend-dependent legacy scheduling; "
+            "prefer --replay_sample_ratio for comparisons"
+        )
     collected_transitions = 0
     environment_steps = 0
     gradient_updates = 0
@@ -109,6 +140,7 @@ def main() -> None:
     start = time.perf_counter()
     try:
         while collected_transitions < args_cli.total_transitions:
+            transitions_before_step = collected_transitions
             transition_observation = observation.clone()
             if collected_transitions < args_cli.learning_starts:
                 action = torch.empty(
@@ -146,7 +178,14 @@ def main() -> None:
                 collected_transitions >= args_cli.learning_starts
                 and replay.size >= args_cli.batch_size
             ):
-                for _ in range(args_cli.updates_per_step):
+                eligible_new_transitions = collected_transitions - max(
+                    transitions_before_step,
+                    args_cli.learning_starts,
+                )
+                updates_this_step = update_scheduler.updates_for(
+                    eligible_new_transitions
+                )
+                for _ in range(updates_this_step):
                     last_metrics = agent.update(replay, args_cli.batch_size)
                     gradient_updates += 1
             if environment_steps % args_cli.log_interval_steps == 0:
@@ -160,6 +199,7 @@ def main() -> None:
                 print(
                     f"step={environment_steps} transitions={collected_transitions:,} "
                     f"replay={replay.size:,} updates={gradient_updates:,} "
+                    f"sample_ratio={update_scheduler.achieved_ratio:.3f} "
                     f"reward={mean_reward:.4f} throughput={throughput:,.0f}/s "
                     f"{metric_text}"
                 )
@@ -190,6 +230,17 @@ def main() -> None:
         "collected_transitions": collected_transitions,
         "environment_steps": environment_steps,
         "gradient_updates": gradient_updates,
+        "batch_size": args_cli.batch_size,
+        "replay_sample_ratio_target": (
+            None
+            if args_cli.updates_per_step is not None
+            else args_cli.replay_sample_ratio
+        ),
+        "updates_per_vector_step_override": args_cli.updates_per_step,
+        "eligible_training_transitions": update_scheduler.eligible_transitions,
+        "replay_sample_ratio_achieved": update_scheduler.achieved_ratio,
+        "gradient_updates_per_transition": gradient_updates
+        / max(1, update_scheduler.eligible_transitions),
         "wall_time_s": elapsed,
         "transitions_per_second": collected_transitions / max(elapsed, 1.0e-9),
         "contract_sha256": contract_sha256(),

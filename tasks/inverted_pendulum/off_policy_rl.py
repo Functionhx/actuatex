@@ -1,15 +1,16 @@
 """Shared SAC and TD3 implementations for MuJoCo and Isaac Lab.
 
-The module intentionally depends only on PyTorch.  Both physics backends feed
-the same 14-observation / 1-action contract into these agents, so differences
-in results come from dynamics and data collection rather than two unrelated
-algorithm implementations.
+The module intentionally depends only on PyTorch. Both physics backends feed
+the same task-specific observation/action contract into these agents, so
+differences in results come from dynamics and data collection rather than two
+unrelated algorithm implementations.
 """
 
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import math
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,69 @@ from torch.nn import functional as F
 
 
 CHECKPOINT_FORMAT = "actuatex_off_policy_v1"
+
+
+@dataclass
+class ReplayRatioScheduler:
+    """Convert a backend-independent replay ratio into gradient updates.
+
+    ``replay_sample_ratio`` is the number of replay rows sampled by optimizer
+    batches per newly collected transition. Counting sampled rows, instead of
+    vector-environment calls, keeps the training budget comparable when the
+    number of environments or the minibatch size changes.
+
+    ``updates_per_vector_step`` is a legacy escape hatch. When supplied it
+    deliberately restores the old backend-dependent behavior and the achieved
+    replay ratio remains observable through :attr:`achieved_ratio`.
+    """
+
+    batch_size: int
+    replay_sample_ratio: float = 4.0
+    updates_per_vector_step: int | None = None
+    pending_update_credit: float = field(init=False, default=0.0)
+    eligible_transitions: int = field(init=False, default=0)
+    gradient_updates: int = field(init=False, default=0)
+
+    def __post_init__(self) -> None:
+        if self.batch_size <= 0:
+            raise ValueError("batch_size must be positive")
+        if (
+            not math.isfinite(self.replay_sample_ratio)
+            or self.replay_sample_ratio <= 0.0
+        ):
+            raise ValueError("replay_sample_ratio must be finite and positive")
+        if (
+            self.updates_per_vector_step is not None
+            and self.updates_per_vector_step <= 0
+        ):
+            raise ValueError("updates_per_vector_step must be positive when set")
+
+    def updates_for(self, new_transitions: int) -> int:
+        """Return optimizer updates earned by newly trainable transitions."""
+
+        if new_transitions < 0:
+            raise ValueError("new_transitions cannot be negative")
+        if new_transitions == 0:
+            return 0
+        self.eligible_transitions += new_transitions
+        if self.updates_per_vector_step is not None:
+            updates = self.updates_per_vector_step
+        else:
+            self.pending_update_credit += (
+                new_transitions * self.replay_sample_ratio / self.batch_size
+            )
+            updates = math.floor(self.pending_update_credit + 1.0e-12)
+            self.pending_update_credit -= updates
+        self.gradient_updates += updates
+        return updates
+
+    @property
+    def achieved_ratio(self) -> float:
+        """Replay rows sampled per eligible transition so far."""
+
+        if self.eligible_transitions == 0:
+            return 0.0
+        return self.gradient_updates * self.batch_size / self.eligible_transitions
 
 
 def _mlp(
