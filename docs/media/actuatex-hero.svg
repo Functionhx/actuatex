@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="520" viewBox="0 0 1440 520" role="img" aria-labelledby="title desc">
+  <title id="title">ActuateX — Learn. Act. Control.</title>
+  <desc id="desc">A dark technical banner showing a stylized quadruped and the MuJoCo, Isaac Gym, and Isaac Lab simulation backends.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#06101d"/>
+      <stop offset="0.55" stop-color="#0a1a2d"/>
+      <stop offset="1" stop-color="#101c30"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#44d7ff"/>
+      <stop offset="0.5" stop-color="#71f6d1"/>
+      <stop offset="1" stop-color="#ffb45b"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#143b59"/>
+      <stop offset="1" stop-color="#0d263d"/>
+    </linearGradient>
+    <radialGradient id="halo">
+      <stop offset="0" stop-color="#36d6ff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#36d6ff" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#8ec7e8" stroke-opacity="0.08" stroke-width="1"/>
+    </pattern>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1440" height="520" rx="28" fill="url(#bg)"/>
+  <rect width="1440" height="520" rx="28" fill="url(#grid)"/>
+  <circle cx="1120" cy="250" r="310" fill="url(#halo)"/>
+  <path d="M0 454C290 412 470 498 736 453s461-18 704-73v140H0Z" fill="#06101c" fill-opacity="0.74"/>
+  <path d="M0 454C290 412 470 498 736 453s461-18 704-73" fill="none" stroke="#65e8d6" stroke-opacity="0.22" stroke-width="2"/>
+
+  <g transform="translate(88 72)">
+    <g transform="translate(0 1)">
+      <path d="M0 0H46L65 19 46 38H0L19 19Z" fill="none" stroke="url(#accent)" stroke-width="3"/>
+      <circle cx="32" cy="19" r="7" fill="#66edd7" filter="url(#glow)"/>
+    </g>
+    <text x="82" y="30" fill="#e7f7ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="27" font-weight="750" letter-spacing="5">ACTUATEX</text>
+    <text x="0" y="102" fill="#f5fbff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="64" font-weight="760" letter-spacing="-1">Learn. Act. Control.</text>
+    <rect x="0" y="126" width="430" height="5" rx="2.5" fill="url(#accent)"/>
+    <text x="0" y="174" fill="#a8c4d8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="23">A hands-on classroom for robust robot learning</text>
+    <text x="0" y="210" fill="#7899b2" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18">ONE ROBOT  ·  THREE PHYSICS ENGINES  ·  REPRODUCIBLE EVIDENCE</text>
+
+    <g transform="translate(0 258)" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="650">
+      <rect width="142" height="45" rx="22.5" fill="#102b40" stroke="#44d7ff" stroke-opacity="0.55"/>
+      <circle cx="25" cy="22.5" r="5" fill="#44d7ff"/>
+      <text x="42" y="29" fill="#dff8ff">MuJoCo</text>
+      <g transform="translate(157)">
+        <rect width="157" height="45" rx="22.5" fill="#102b40" stroke="#71f6d1" stroke-opacity="0.55"/>
+        <circle cx="25" cy="22.5" r="5" fill="#71f6d1"/>
+        <text x="42" y="29" fill="#e4fff8">Isaac Gym</text>
+      </g>
+      <g transform="translate(329)">
+        <rect width="198" height="45" rx="22.5" fill="#102b40" stroke="#ffb45b" stroke-opacity="0.62"/>
+        <circle cx="25" cy="22.5" r="5" fill="#ffb45b"/>
+        <text x="42" y="29" fill="#fff1de">Isaac Lab + Sim</text>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(822 90)">
+    <circle cx="275" cy="170" r="166" fill="none" stroke="#6ce8e0" stroke-opacity="0.15" stroke-width="1.5"/>
+    <circle cx="275" cy="170" r="125" fill="none" stroke="#44d7ff" stroke-opacity="0.13" stroke-width="1.5" stroke-dasharray="4 10"/>
+    <path d="M75 354H504" stroke="#8fb8cb" stroke-opacity="0.25" stroke-width="2"/>
+    <path d="M119 354l42-34h62l41-38h75l43-46h112" fill="none" stroke="#ffb45b" stroke-opacity="0.54" stroke-width="3"/>
+
+    <g stroke-linecap="round" stroke-linejoin="round">
+      <path d="M195 135L359 122 399 174 215 190Z" fill="url(#body)" stroke="#b9f4ff" stroke-width="3"/>
+      <path d="M359 122l44-17 40 23-44 46" fill="#102f48" stroke="#b9f4ff" stroke-width="3"/>
+      <circle cx="418" cy="126" r="6" fill="#ffb45b" filter="url(#glow)"/>
+      <path d="M219 184l-32 61 31 61-13 43" fill="none" stroke="#d3f8ff" stroke-width="9"/>
+      <path d="M270 185l16 58-32 63 10 43" fill="none" stroke="#d3f8ff" stroke-width="9"/>
+      <path d="M349 175l26 58-9 60 25 44" fill="none" stroke="#d3f8ff" stroke-width="9"/>
+      <path d="M393 167l47 47-6 65 42 39" fill="none" stroke="#d3f8ff" stroke-width="9"/>
+      <g fill="#66edd7" stroke="#071522" stroke-width="3">
+        <circle cx="219" cy="184" r="9"/><circle cx="187" cy="245" r="9"/><circle cx="270" cy="185" r="9"/><circle cx="286" cy="243" r="9"/>
+        <circle cx="349" cy="175" r="9"/><circle cx="375" cy="233" r="9"/><circle cx="393" cy="167" r="9"/><circle cx="440" cy="214" r="9"/>
+      </g>
+      <g stroke="#ffb45b" stroke-width="8">
+        <path d="M191 349h31"/><path d="M250 349h30"/><path d="M383 337h31"/><path d="M468 318h31"/>
+      </g>
+      <path d="M196 146l-33-25" stroke="#b9f4ff" stroke-width="5"/>
+    </g>
+
+    <g font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" fill="#93b6c9" letter-spacing="1.5">
+      <path d="M136 83l75 48" stroke="#44d7ff" stroke-opacity="0.45"/>
+      <circle cx="136" cy="83" r="4" fill="#44d7ff"/>
+      <text x="48" y="78">POLICY</text>
+      <path d="M488 84l-69 36" stroke="#ffb45b" stroke-opacity="0.48"/>
+      <circle cx="488" cy="84" r="4" fill="#ffb45b"/>
+      <text x="500" y="89">PHYSICS</text>
+      <path d="M506 221l-65 0" stroke="#71f6d1" stroke-opacity="0.45"/>
+      <circle cx="506" cy="221" r="4" fill="#71f6d1"/>
+      <text x="518" y="226">TRANSFER</text>
+    </g>
+  </g>
+
+  <rect x="1.5" y="1.5" width="1437" height="517" rx="26.5" fill="none" stroke="#8edbf2" stroke-opacity="0.16" stroke-width="3"/>
+</svg>
