@@ -40,7 +40,9 @@ FORBIDDEN_TEXT = {
     "gh" + "p_": "possible GitHub token",
 }
 REQUIRED = {
+    "LICENSE",
     "README.md",
+    "README_en.md",
     "THIRD_PARTY.md",
     "docs/CODE_CHANGES_REPORT.zh-CN.md",
     "robots/tinymal/urdf/tinymal.urdf",

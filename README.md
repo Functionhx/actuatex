@@ -4,14 +4,17 @@
 
 <br />
 
+<p><strong>简体中文</strong> · <a href="./README_en.md">English</a></p>
+
 <a href="https://github.com/Functionhx/actuatex/actions/workflows/repository-checks.yml"><img src="https://img.shields.io/github/actions/workflow/status/Functionhx/actuatex/repository-checks.yml?branch=main&amp;style=flat-square&amp;label=repository%20checks" alt="Repository checks" /></a>
 <a href="https://github.com/Functionhx/actuatex"><img src="https://img.shields.io/github/stars/Functionhx/actuatex?style=flat-square&amp;logo=github&amp;color=44d7ff" alt="GitHub stars" /></a>
 <a href="https://github.com/Functionhx/actuatex/commits/main"><img src="https://img.shields.io/github/last-commit/Functionhx/actuatex?style=flat-square&amp;color=71f6d1" alt="Last commit" /></a>
 <img src="https://img.shields.io/badge/Python-3.8%2B-3776ab?style=flat-square&amp;logo=python&amp;logoColor=white" alt="Python 3.8+" />
 <img src="https://img.shields.io/badge/backends-3-ffb45b?style=flat-square" alt="Three simulation backends" />
+<a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-71f6d1?style=flat-square" alt="MIT License" /></a>
 
 <p><strong>让 TinyMal 在一个模拟器里学会走路，再去另外两个物理世界接受检验。</strong></p>
-<p>一个面向强化学习控制教学的三后端实验室：从站稳、行走、抗扰、上台阶，到双向 sim2sim。</p>
+<p>一个面向强化学习控制教学的开源三后端实验室：从站稳、行走、抗扰、上台阶，到双向 sim2sim。</p>
 
 <p>
   <a href="#quick-start">快速开始</a> ·
@@ -333,9 +336,9 @@ ActuateX 建立在 [RSL-RL](https://github.com/leggedrobotics/rsl_rl)、[Unitree
 
 ## ⚖️ 许可证与资产说明
 
-本仓库不分发 NVIDIA 模拟器二进制。上游版本、补丁来源和许可证见 [`THIRD_PARTY.md`](./THIRD_PARTY.md) 与 [`third_party/licenses/`](./third_party/licenses/)。TinyMal 模型来自课程材料，公开再分发前请先阅读 [`ASSET_NOTICE.md`](./robots/tinymal/ASSET_NOTICE.md)。
+ActuateX 原创源码与文档采用 [MIT License](./LICENSE)，可以在保留版权和许可声明的前提下使用、修改与分发。
 
-**当前尚未声明项目级开源许可证。** 公开可读不等于自动授予复制、修改或再分发权；在许可证确定前，请将本仓库用于审阅与课程复现，并分别遵守上游软件和机器人资产条款。
+本仓库不分发 NVIDIA 模拟器二进制。上游版本、补丁来源和许可证见 [`THIRD_PARTY.md`](./THIRD_PARTY.md) 与 [`third_party/licenses/`](./third_party/licenses/)。第三方软件、兼容补丁和课程提供的 TinyMal 模型仍分别受其原始条款约束；MIT 许可证不会授予 ActuateX 并不拥有的资产权利。复制或再分发机器人模型前请先阅读 [`ASSET_NOTICE.md`](./robots/tinymal/ASSET_NOTICE.md)。
 
 ---
 

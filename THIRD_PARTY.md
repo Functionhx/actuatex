@@ -13,4 +13,6 @@ ActuateX uses, but does not vendor, the following major dependencies:
 
 Copies of the BSD license texts required by the included compatibility patches are in `third_party/licenses/`.
 
-The TinyMal URDF and meshes were supplied as course assets. Their files contain no complete redistribution grant. They are included in this initial private repository for reproducibility; confirm ownership and licensing or replace them before a public release.
+Original ActuateX source code and documentation are released under the project [MIT License](LICENSE). Third-party software, included compatibility patches, and course-supplied assets remain subject to their own terms.
+
+The TinyMal URDF and meshes were supplied as course assets. Their files contain no complete redistribution grant and are not relicensed by ActuateX. They remain in the public repository for course reproducibility; confirm ownership and licensing before redistributing them, or replace them with a redistributable equivalent. See `robots/tinymal/ASSET_NOTICE.md`.
