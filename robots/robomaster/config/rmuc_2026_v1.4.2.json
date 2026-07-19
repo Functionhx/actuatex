@@ -1,0 +1,35 @@
+{
+  "source": {
+    "title": "RoboMaster 2026 University Championship Rule Manual V1.4.2",
+    "published": "2026-04-30",
+    "url": "https://bbs-web-static.robomaster.com/1f59fe9c9d154752a5e456e1f7139d4c1777519819115/RoboMaster%202026%20University%20Championship%20Rule%20Manual%20V1.4.2%EF%BC%8820260430%EF%BC%89.pdf",
+    "sha256": "a693e5d9fec18b963325c2fd94a5cdccc5f28ca6e560833be73a095a2a676633",
+    "size_bytes": 15808821
+  },
+  "sentry_full_auto": {
+    "projectile_diameter_m": 0.0168,
+    "projectile_diameter_tolerance_m": 0.0002,
+    "projectile_mass_kg": 0.0032,
+    "projectile_mass_tolerance_kg": 0.0001,
+    "initial_launch_speed_limit_mps": 25.0,
+    "barrel_heat_per_projectile": 10.0,
+    "barrel_heat_limit": 260.0,
+    "barrel_heat_cooling_per_second": 30.0,
+    "chassis_power_limit_w": 100.0,
+    "chassis_buffer_energy_limit_j": 60.0,
+    "referee_detection_period_s": 0.1,
+    "power_off_duration_s": 5.0
+  },
+  "sentry_semi_auto": {
+    "barrel_heat_limit": 100.0,
+    "barrel_heat_cooling_per_second": 10.0,
+    "chassis_power_limit_w": 60.0
+  },
+  "manual_locations": {
+    "sentry": "Section 3.5 / Table 3-7",
+    "projectile": "Section 4.6.2 / Table 4-1",
+    "barrel_heat": "Section 5.1.3",
+    "chassis_power": "Section 5.1.4"
+  },
+  "note": "This file versions simulation/referee parameters; the official manual remains authoritative. Motor constants and robot geometry are ActuateX nominals, not official DJI hardware specifications."
+}

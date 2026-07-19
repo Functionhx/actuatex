@@ -372,12 +372,28 @@ def main(env_cfg: ManagerBasedRLEnvCfg, agent_cfg):
             agent_cfg.max_iterations - warmup,
             randomize_episode_length=next_iteration == 0,
         )
+    elapsed = time.time() - t0
     if args_cli.output_checkpoint is not None:
         output_path = os.path.abspath(args_cli.output_checkpoint)
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        runner.save(output_path)
+        checkpoint_infos = {
+            "backend": (
+                "Isaac Sim 6.0.1 GA / "
+                "Isaac Lab 3.0.0-beta2.patch1 / PhysX 5"
+            ),
+            "task": args_cli.task,
+            "seed": args_cli.seed,
+            "num_envs": env_cfg.scene.num_envs,
+            "iterations": agent_cfg.max_iterations,
+            "wall_time_s": elapsed,
+        }
+        if "Sentinel" in args_cli.task:
+            from tasks.robomaster.contract import contract_sha256
+
+            checkpoint_infos["contract_sha256"] = contract_sha256()
+        runner.save(output_path, infos=checkpoint_infos)
         print(f"[INFO] canonical checkpoint = {output_path}")
-    print(f"Training time: {round(time.time() - t0, 2)} s")
+    print(f"Training time: {round(elapsed, 2)} s")
     env.close()
 
 

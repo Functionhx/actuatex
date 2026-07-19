@@ -1,8 +1,10 @@
 # ActuateX Sentinel：RoboMaster 风格轮腿机器人路线图
 
-> 状态：设计基线
+> 状态：M0 动力学与双后端训练管线已实现
 > 规则快照：RoboMaster 2026 University Championship Rule Manual V1.4.2，2026-04-30
 > 原则：仿真优先、接口可审计、赛季参数配置化、真实机构低能量且规则合规
+
+阶段一的社区机械调研、当前 17.015 kg 模型、Isaac Sim 保真边界、验证命令和下一步参数辨识计划见 [Sentinel 阶段一报告](./ROBOMASTER_SENTINEL_PHASE1.zh-CN.md)。报告明确区分“训练/迁移管线已打通”与“高质量策略尚未完成长训”。
 
 ## 1. 我们要做什么
 

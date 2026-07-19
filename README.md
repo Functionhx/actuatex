@@ -258,6 +258,8 @@ MUJOCO_GL=egl python backends/mujoco/record_mujoco_stairs.py \
 
 仓库现在也包含一台原创 6-DOF 串联式双轮腿机器人：两阶段训练共采样 1.376 亿条 transition，加入 0–20 ms 延迟并完成 1024 环境未见扰动 A/B，最终策略已导出为 TorchScript。机械结构、开源项目筛选、训练命令、不利结果和部署边界见 [轮腿 RL 完整报告](./docs/WHEEL_LEGGED_RL.zh-CN.md)。
 
+在此基础上，`ActuateX Sentinel` 已完成 RoboMaster 级 11-DOF 双后端动力学骨架：原创串联轮腿、云台/摩擦轮/拨弹机构、500 Hz 显式 DC 电机、功率缓冲与热状态，以及 PPO/SAC/TD3 的 MuJoCo/Isaac Lab 训练和双向推理入口。当前只有 smoke 证据，尚不宣称得到高质量比赛策略；社区机械调研、Isaac Sim 能力边界与复现命令见 [Sentinel 阶段一报告](./docs/ROBOMASTER_SENTINEL_PHASE1.zh-CN.md)。
+
 <div align="center">
   <img src="./docs/media/serial_wheel_legged_sim6.jpg" alt="ActuateX serial wheel-legged robot running in Isaac Sim 6" width="78%" />
   <br /><sub>真实 Sim 6 rollout 帧；演示包含前进、倒车、双向转向与正反弧线，全程 0 跌倒</sub>
@@ -287,6 +289,7 @@ MUJOCO_GL=egl python backends/mujoco/record_mujoco_stairs.py \
 | 如何公平比较 checkpoint | [`compare_checkpoints.py`](./tools/checkpoints/compare_checkpoints.py) | [`compare_sim2sim.py`](./tools/sim2sim/compare_sim2sim.py) |
 | 如何保留 MID360 逐点角度与时间 | [`mid360_rtx.py`](./backends/isaac_lab/tinymal_lab/mid360_rtx.py) | [`validate_mid360_rtx.py`](./backends/isaac_lab/scripts/validate_mid360_rtx.py) |
 | 如何训练 6-DOF 串联式轮腿 | [`wheel_legged_env_cfg.py`](./backends/isaac_lab/tinymal_lab/wheel_legged_env_cfg.py) | [`WHEEL_LEGGED_RL.zh-CN.md`](./docs/WHEEL_LEGGED_RL.zh-CN.md) |
+| 如何实现 RoboMaster 级动力学与双向 sim2sim | [`contract.py`](./tasks/robomaster/contract.py) | [`ROBOMASTER_SENTINEL_PHASE1.zh-CN.md`](./docs/ROBOMASTER_SENTINEL_PHASE1.zh-CN.md) |
 | 如何把人形策略接到仿真与硬件顺序 | [`g1_29dof.py`](./tasks/locomotion/g1_29dof.py) | [`INDUSTRIAL_RL_STACK.zh-CN.md`](./docs/INDUSTRIAL_RL_STACK.zh-CN.md) |
 | Lab 与 Gym 到底改了什么 | [`CODE_CHANGES_REPORT.zh-CN.md`](./docs/CODE_CHANGES_REPORT.zh-CN.md) | [`ActuateX_代码修改报告.pdf`](./docs/ActuateX_代码修改报告.pdf) |
 
@@ -305,6 +308,7 @@ actuatex/
 ├── robots/
 │   ├── tinymal/         # 机器狗 URDF、mesh 与资产声明
 │   ├── wheel_legged/    # 原创 6-DOF 串联式双轮腿 URDF
+│   ├── robomaster/      # Sentinel 成对 URDF/MJCF 与赛季规则配置
 │   ├── g1/              # 官方人形上游固定版本与 29-DOF 说明
 │   └── sensors/         # MID360 外观、扫描表与传感器资产
 ├── tasks/               # 后端无关的控制、观测、执行器与安全契约
@@ -342,6 +346,7 @@ actuatex/
 - [x] ROS 2 Nav2 入口、RTX LiDAR、标定相机 RGB/CameraInfo/depth writers
 - [x] MID360 官方 800k 非重复扫描表、逐点时间、四线布局与 Sim 6 全密度联调
 - [x] 原创串联式双轮腿、Sim 6 两阶段 PPO、延迟鲁棒性 A/B 与 TorchScript 导出
+- [x] Sentinel 11-DOF 成对资产、显式电机/功率/热/发射契约及 PPO/SAC/TD3 双后端 smoke
 - [x] G1 29-DOF SDK 关节顺序、480-D 历史观测、电机包络与运行时安全契约
 - [ ] 缩小 Isaac Lab → MuJoCo 的执行器与接触差异
 - [ ] 用真实数据标定相机与 MID360 强度/噪声/丢点/运动畸变，并补 Livox UDP 包级仿真

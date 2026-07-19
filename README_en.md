@@ -258,6 +258,8 @@ The final Sim 6 H.264 1280×720 PPT cut is generated at `artifacts/isaac_sim_6/v
 
 The repository now also includes an original 6-DOF serial two-wheel-leg robot. Its two-stage run collected 137.6 million transitions, randomized 0–20 ms actuator delay, passed a 1024-environment unseen-dynamics A/B test, and was exported to TorchScript. The [full wheel-legged report](./docs/WHEEL_LEGGED_RL.zh-CN.md) records project screening, mechanics, commands, unfavorable results, and deployment limits.
 
+Building on that base, `ActuateX Sentinel` now has a RoboMaster-grade 11-DOF dual-backend dynamics skeleton: an original serial wheel-leg, gimbal/flywheel/feeder joints, a 500 Hz explicit DC-motor model, power-buffer and thermal states, plus PPO/SAC/TD3 training and bidirectional inference entry points for MuJoCo and Isaac Lab. Only smoke evidence exists so far, so this is not presented as a competition-ready policy. The [Sentinel phase-one report](./docs/ROBOMASTER_SENTINEL_PHASE1.zh-CN.md) documents the community mechanical survey, Isaac Sim fidelity boundary, and reproduction commands.
+
 <div align="center">
   <img src="./docs/media/serial_wheel_legged_sim6.jpg" alt="ActuateX serial wheel-legged robot running in Isaac Sim 6" width="78%" />
   <br /><sub>Real Sim 6 rollout frame; the clip covers forward, reverse, both yaw directions, and paired arcs with zero falls</sub>
@@ -287,6 +289,7 @@ Build conclusions from four layers of evidence:
 | How are checkpoints compared fairly? | [`compare_checkpoints.py`](./tools/checkpoints/compare_checkpoints.py) | [`compare_sim2sim.py`](./tools/sim2sim/compare_sim2sim.py) |
 | How are MID360 point angles and firing times preserved? | [`mid360_rtx.py`](./backends/isaac_lab/tinymal_lab/mid360_rtx.py) | [`validate_mid360_rtx.py`](./backends/isaac_lab/scripts/validate_mid360_rtx.py) |
 | How is the 6-DOF serial wheel-leg trained? | [`wheel_legged_env_cfg.py`](./backends/isaac_lab/tinymal_lab/wheel_legged_env_cfg.py) | [`WHEEL_LEGGED_RL.zh-CN.md`](./docs/WHEEL_LEGGED_RL.zh-CN.md) |
+| How are RoboMaster-grade dynamics and sim2sim implemented? | [`contract.py`](./tasks/robomaster/contract.py) | [`ROBOMASTER_SENTINEL_PHASE1.zh-CN.md`](./docs/ROBOMASTER_SENTINEL_PHASE1.zh-CN.md) |
 | How does a humanoid policy align simulation and hardware order? | [`g1_29dof.py`](./tasks/locomotion/g1_29dof.py) | [`INDUSTRIAL_RL_STACK.zh-CN.md`](./docs/INDUSTRIAL_RL_STACK.zh-CN.md) |
 | What changed between Lab and Gym? | [`CODE_CHANGES_REPORT.zh-CN.md`](./docs/CODE_CHANGES_REPORT.zh-CN.md) | [`ActuateX_代码修改报告.pdf`](./docs/ActuateX_代码修改报告.pdf) |
 
@@ -305,6 +308,7 @@ actuatex/
 ├── robots/
 │   ├── tinymal/         # quadruped URDF, meshes, and asset notice
 │   ├── wheel_legged/    # original 6-DOF serial two-wheel-leg URDF
+│   ├── robomaster/      # paired Sentinel URDF/MJCF and season-rule config
 │   ├── g1/              # pinned official humanoid sources and 29-DOF notes
 │   └── sensors/         # MID360 appearance, scan table, and sensor assets
 ├── tasks/               # backend-neutral control, observation, actuator, safety contracts
@@ -342,6 +346,7 @@ Large upstream projects belong in ignored `_deps/` checkouts, and runtime output
 - [x] ROS 2 Nav2 entry point, RTX LiDAR, calibrated-camera RGB/CameraInfo/depth writers
 - [x] Official 800k MID360 non-repetitive pattern, point timing, four-line layout, and full-density Sim 6 rollout
 - [x] Original serial wheel-leg, two-stage Sim 6 PPO, delayed-robust A/B, and TorchScript export
+- [x] Sentinel 11-DOF paired assets, explicit motor/power/thermal/launcher contract, and dual-backend PPO/SAC/TD3 smoke
 - [x] G1 29-DOF SDK order, 480-D history, motor envelope, and runtime safety contract
 - [ ] Narrow the Isaac Lab → MuJoCo actuator and contact gap
 - [ ] Calibrate real camera and MID360 intensity/noise/dropout/motion distortion, then add Livox UDP packet-level simulation

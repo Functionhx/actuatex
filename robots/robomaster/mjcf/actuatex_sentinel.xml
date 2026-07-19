@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MuJoCo twin of the original ActuateX Sentinel URDF.
+
+  The shared Python powertrain applies voltage/current/power/thermal limits;
+  this asset therefore exposes raw joint-torque motors and contains no hidden
+  actuator gains. Joint order, mass, inertia, axes and limits mirror the URDF.
+-->
+<mujoco model="actuatex_sentinel">
+  <compiler angle="radian" autolimits="true" inertiafromgeom="false"/>
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"
+          cone="elliptic" impratio="10" iterations="80" ls_iterations="20"/>
+  <visual>
+    <global offwidth="1280" offheight="720"/>
+    <quality shadowsize="2048"/>
+  </visual>
+
+  <default>
+    <joint damping="0" frictionloss="0"/>
+    <default class="leg_joint">
+      <joint type="hinge" axis="0 1 0" armature="0.005" limited="true"/>
+    </default>
+    <default class="wheel_joint">
+      <joint type="hinge" axis="0 1 0" armature="0.0110592" limited="false"/>
+    </default>
+    <default class="gimbal_joint">
+      <joint type="hinge" armature="0.00072" limited="true"/>
+    </default>
+    <default class="flywheel_joint">
+      <joint type="hinge" axis="0 1 0" armature="0.00002" limited="false"/>
+    </default>
+    <default class="feeder_joint">
+      <joint type="hinge" axis="0 1 0" armature="0.000083" limited="false"/>
+    </default>
+    <default class="robot_collision">
+      <geom contype="1" conaffinity="0" condim="6"
+            friction="1.0 0.005 0.0001" solref="0.015 1"
+            solimp="0.92 0.98 0.001" margin="0.0005"/>
+    </default>
+    <default class="robot_visual">
+      <geom contype="0" conaffinity="0" group="2"/>
+    </default>
+    <default class="armor_collision">
+      <geom contype="1" conaffinity="0" condim="4"
+            friction="0.8 0.005 0.0001" solref="0.01 1"
+            solimp="0.95 0.99 0.001"/>
+    </default>
+  </default>
+
+  <asset>
+    <material name="actuatex_orange" rgba="1.0 0.30 0.04 1.0"/>
+    <material name="graphite" rgba="0.075 0.085 0.10 1.0"/>
+    <material name="metal" rgba="0.48 0.53 0.58 1.0"/>
+    <material name="sensor_black" rgba="0.015 0.02 0.025 1.0"/>
+    <material name="armor_blue" rgba="0.04 0.34 0.96 0.82"/>
+    <material name="floor_material" rgba="0.17 0.19 0.22 1.0"/>
+  </asset>
+
+  <worldbody>
+    <light name="key_light" pos="1 -2 4" dir="-0.2 0.3 -1" diffuse="0.9 0.9 0.9"/>
+    <light name="fill_light" pos="-2 2 2.5" dir="0.4 -0.3 -1" diffuse="0.35 0.38 0.45"/>
+    <geom name="floor" type="plane" size="0 0 0.1" material="floor_material"
+          contype="0" conaffinity="1" condim="6"
+          friction="1.0 0.005 0.0001" solref="0.015 1"
+          solimp="0.92 0.98 0.001"/>
+
+    <body name="base_link" pos="0 0 0.515">
+      <freejoint name="root"/>
+      <inertial pos="0 0 0" mass="10.5"
+                diaginertia="0.14875 0.22400 0.32830"/>
+      <geom name="base_collision" class="robot_collision" type="box"
+            size="0.24 0.19 0.08" material="graphite"/>
+      <geom name="top_plate_visual" class="robot_visual" type="box"
+            pos="0.02 0 0.086" size="0.15 0.13 0.006"
+            material="actuatex_orange"/>
+      <site name="imu_site" pos="0 0 0.02" size="0.008" rgba="0.2 0.8 1 1"/>
+
+      <body name="left_upper_link" pos="0 0.22 -0.04">
+        <joint name="left_hip_joint" class="leg_joint" range="-1.0 1.0"/>
+        <inertial pos="0 0 -0.075" mass="0.16"
+                  diaginertia="0.000327 0.000321 0.000048"/>
+        <geom name="left_upper_collision" class="robot_collision" type="box"
+              pos="0 0 -0.075" size="0.020 0.0225 0.075"
+              material="actuatex_orange"/>
+        <body name="left_lower_link" pos="0 0 -0.15">
+          <joint name="left_knee_joint" class="leg_joint" range="-1.5 0.2"/>
+          <inertial pos="0 0 -0.125" mass="0.36"
+                    diaginertia="0.001923 0.001923 0.000096"/>
+          <geom name="left_lower_collision" class="robot_collision" type="box"
+                pos="0 0 -0.125" size="0.020 0.020 0.125" material="metal"/>
+          <body name="left_wheel_link" pos="0 0 -0.25">
+            <joint name="left_wheel_joint" class="wheel_joint"/>
+            <inertial pos="0 0 0" mass="1.22"
+                      diaginertia="0.002082 0.003431 0.002082"/>
+            <geom name="left_wheel_collision" class="robot_collision"
+                  type="cylinder" size="0.075 0.030"
+                  quat="0.7071067811865476 0.7071067811865475 0 0"
+                  material="graphite"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="right_upper_link" pos="0 -0.22 -0.04">
+        <joint name="right_hip_joint" class="leg_joint" range="-1.0 1.0"/>
+        <inertial pos="0 0 -0.075" mass="0.16"
+                  diaginertia="0.000327 0.000321 0.000048"/>
+        <geom name="right_upper_collision" class="robot_collision" type="box"
+              pos="0 0 -0.075" size="0.020 0.0225 0.075"
+              material="actuatex_orange"/>
+        <body name="right_lower_link" pos="0 0 -0.15">
+          <joint name="right_knee_joint" class="leg_joint" range="-1.5 0.2"/>
+          <inertial pos="0 0 -0.125" mass="0.36"
+                    diaginertia="0.001923 0.001923 0.000096"/>
+          <geom name="right_lower_collision" class="robot_collision" type="box"
+                pos="0 0 -0.125" size="0.020 0.020 0.125" material="metal"/>
+          <body name="right_wheel_link" pos="0 0 -0.25">
+            <joint name="right_wheel_joint" class="wheel_joint"/>
+            <inertial pos="0 0 0" mass="1.22"
+                      diaginertia="0.002082 0.003431 0.002082"/>
+            <geom name="right_wheel_collision" class="robot_collision"
+                  type="cylinder" size="0.075 0.030"
+                  quat="0.7071067811865476 0.7071067811865475 0 0"
+                  material="graphite"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="gimbal_yaw_carrier" pos="0.03 0 0.10">
+        <joint name="gimbal_yaw_joint" class="gimbal_joint" axis="0 0 1"
+               range="-3.14159265359 3.14159265359"/>
+        <inertial pos="0 0 0.04" mass="0.85"
+                  diaginertia="0.001842 0.002748 0.003683"/>
+        <geom name="yaw_carrier_collision" class="robot_collision" type="box"
+              pos="0 0 0.04" size="0.09 0.07 0.04" material="metal"/>
+
+        <body name="gimbal_pitch_assembly" pos="0.03 0 0.12">
+          <joint name="gimbal_pitch_joint" class="gimbal_joint" axis="0 1 0"
+                 range="-0.35 0.55"/>
+          <inertial pos="0.13 0 0" mass="0.75"
+                    diaginertia="0.001025 0.006025 0.006250"/>
+          <geom name="pitch_assembly_collision" class="robot_collision" type="box"
+                pos="0.13 0 0" size="0.15 0.05 0.04" material="graphite"/>
+          <geom name="barrel_visual" class="robot_visual" type="cylinder"
+                pos="0.30 0 0" size="0.014 0.08"
+                quat="0.7071067811865476 0 0.7071067811865475 0"
+                material="metal"/>
+          <site name="muzzle_site" pos="0.38 0 0" size="0.010"
+                rgba="1.0 0.25 0.05 1"/>
+
+          <body name="left_flywheel_link" pos="0.15 0.052 0">
+            <joint name="left_flywheel_joint" class="flywheel_joint"/>
+            <inertial pos="0 0 0" mass="0.12"
+                      diaginertia="0.000031 0.000061 0.000031"/>
+            <geom name="left_flywheel_visual" class="robot_visual"
+                  type="cylinder" size="0.030 0.010"
+                  quat="0.7071067811865476 0.7071067811865475 0 0"
+                  material="actuatex_orange"/>
+          </body>
+          <body name="right_flywheel_link" pos="0.15 -0.052 0">
+            <joint name="right_flywheel_joint" class="flywheel_joint"/>
+            <inertial pos="0 0 0" mass="0.12"
+                      diaginertia="0.000031 0.000061 0.000031"/>
+            <geom name="right_flywheel_visual" class="robot_visual"
+                  type="cylinder" size="0.030 0.010"
+                  quat="0.7071067811865476 0.7071067811865475 0 0"
+                  material="actuatex_orange"/>
+          </body>
+          <body name="feeder_link" pos="-0.04 0 0">
+            <joint name="feeder_joint" class="feeder_joint"/>
+            <inertial pos="0 0 0" mass="0.18"
+                      diaginertia="0.000055 0.000083 0.000055"/>
+            <geom name="feeder_visual" class="robot_visual"
+                  type="cylinder" size="0.030 0.015"
+                  quat="0.7071067811865476 0.7071067811865475 0 0"
+                  material="metal"/>
+          </body>
+          <body name="camera_link" pos="0.19 0 0.065">
+            <inertial pos="0 0 0" mass="0.15"
+                      diaginertia="0.000040 0.000065 0.000075"/>
+            <geom name="camera_visual" class="robot_visual" type="box"
+                  size="0.0225 0.0375 0.0225" material="sensor_black"/>
+            <camera name="tracking_camera" mode="fixed" fovy="82"
+                    quat="0.7071067811865476 0 -0.7071067811865475 0"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="mid360_link" pos="-0.14 0 0.09">
+        <inertial pos="0 0 0.030" mass="0.265"
+                  diaginertia="0.00023 0.00023 0.00018"/>
+        <geom name="mid360_visual" class="robot_visual" type="cylinder"
+              pos="0 0 0.030" size="0.040 0.030" material="sensor_black"/>
+        <site name="mid360_site" pos="0 0 0.060" size="0.006"
+              rgba="0.1 1.0 0.4 1"/>
+      </body>
+
+      <body name="front_armor_link" pos="0.246 0 0">
+        <inertial pos="0 0 0" mass="0.15"
+                  diaginertia="0.00020 0.00038 0.00058"/>
+        <geom name="front_armor" class="armor_collision" type="box"
+              size="0.006 0.14 0.05" material="armor_blue"/>
+        <site name="front_armor_site" type="box" size="0.007 0.141 0.051"
+              rgba="0.04 0.34 0.96 0.15"/>
+      </body>
+      <body name="rear_armor_link" pos="-0.246 0 0">
+        <inertial pos="0 0 0" mass="0.15"
+                  diaginertia="0.00020 0.00038 0.00058"/>
+        <geom name="rear_armor" class="armor_collision" type="box"
+              size="0.006 0.14 0.05" material="armor_blue"/>
+        <site name="rear_armor_site" type="box" size="0.007 0.141 0.051"
+              rgba="0.04 0.34 0.96 0.15"/>
+      </body>
+      <body name="left_armor_link" pos="0 0.196 0">
+        <inertial pos="0 0 0" mass="0.15"
+                  diaginertia="0.00038 0.00020 0.00058"/>
+        <geom name="left_armor" class="armor_collision" type="box"
+              size="0.14 0.006 0.05" material="armor_blue"/>
+        <site name="left_armor_site" type="box" size="0.141 0.007 0.051"
+              rgba="0.04 0.34 0.96 0.15"/>
+      </body>
+      <body name="right_armor_link" pos="0 -0.196 0">
+        <inertial pos="0 0 0" mass="0.15"
+                  diaginertia="0.00038 0.00020 0.00058"/>
+        <geom name="right_armor" class="armor_collision" type="box"
+              size="0.14 0.006 0.05" material="armor_blue"/>
+        <site name="right_armor_site" type="box" size="0.141 0.007 0.051"
+              rgba="0.04 0.34 0.96 0.15"/>
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- Actuator order exactly matches tasks.robomaster.contract.ALL_JOINT_NAMES. -->
+  <actuator>
+    <motor name="left_hip_torque" joint="left_hip_joint" gear="1"
+           ctrllimited="true" ctrlrange="-30 30"/>
+    <motor name="left_knee_torque" joint="left_knee_joint" gear="1"
+           ctrllimited="true" ctrlrange="-30 30"/>
+    <motor name="right_hip_torque" joint="right_hip_joint" gear="1"
+           ctrllimited="true" ctrlrange="-30 30"/>
+    <motor name="right_knee_torque" joint="right_knee_joint" gear="1"
+           ctrllimited="true" ctrlrange="-30 30"/>
+    <motor name="left_wheel_torque" joint="left_wheel_joint" gear="1"
+           ctrllimited="true" ctrlrange="-12 12"/>
+    <motor name="right_wheel_torque" joint="right_wheel_joint" gear="1"
+           ctrllimited="true" ctrlrange="-12 12"/>
+    <motor name="gimbal_yaw_torque" joint="gimbal_yaw_joint" gear="1"
+           ctrllimited="true" ctrlrange="-2 2"/>
+    <motor name="gimbal_pitch_torque" joint="gimbal_pitch_joint" gear="1"
+           ctrllimited="true" ctrlrange="-2 2"/>
+    <motor name="left_flywheel_torque" joint="left_flywheel_joint" gear="1"
+           ctrllimited="true" ctrlrange="-0.45 0.45"/>
+    <motor name="right_flywheel_torque" joint="right_flywheel_joint" gear="1"
+           ctrllimited="true" ctrlrange="-0.45 0.45"/>
+    <motor name="feeder_torque" joint="feeder_joint" gear="1"
+           ctrllimited="true" ctrlrange="-5 5"/>
+  </actuator>
+
+  <sensor>
+    <framequat name="base_orientation" objtype="body" objname="base_link"/>
+    <gyro name="base_angular_velocity" site="imu_site"/>
+    <accelerometer name="base_linear_acceleration" site="imu_site"/>
+    <framepos name="muzzle_position" objtype="site" objname="muzzle_site"/>
+    <framequat name="muzzle_orientation" objtype="site" objname="muzzle_site"/>
+    <framepos name="mid360_position" objtype="site" objname="mid360_site"/>
+    <framequat name="mid360_orientation" objtype="site" objname="mid360_site"/>
+
+    <jointpos name="left_hip_position" joint="left_hip_joint"/>
+    <jointpos name="left_knee_position" joint="left_knee_joint"/>
+    <jointpos name="right_hip_position" joint="right_hip_joint"/>
+    <jointpos name="right_knee_position" joint="right_knee_joint"/>
+    <jointpos name="left_wheel_position" joint="left_wheel_joint"/>
+    <jointpos name="right_wheel_position" joint="right_wheel_joint"/>
+    <jointpos name="gimbal_yaw_position" joint="gimbal_yaw_joint"/>
+    <jointpos name="gimbal_pitch_position" joint="gimbal_pitch_joint"/>
+    <jointpos name="left_flywheel_position" joint="left_flywheel_joint"/>
+    <jointpos name="right_flywheel_position" joint="right_flywheel_joint"/>
+    <jointpos name="feeder_position" joint="feeder_joint"/>
+
+    <jointvel name="left_hip_velocity" joint="left_hip_joint"/>
+    <jointvel name="left_knee_velocity" joint="left_knee_joint"/>
+    <jointvel name="right_hip_velocity" joint="right_hip_joint"/>
+    <jointvel name="right_knee_velocity" joint="right_knee_joint"/>
+    <jointvel name="left_wheel_velocity" joint="left_wheel_joint"/>
+    <jointvel name="right_wheel_velocity" joint="right_wheel_joint"/>
+    <jointvel name="gimbal_yaw_velocity" joint="gimbal_yaw_joint"/>
+    <jointvel name="gimbal_pitch_velocity" joint="gimbal_pitch_joint"/>
+    <jointvel name="left_flywheel_velocity" joint="left_flywheel_joint"/>
+    <jointvel name="right_flywheel_velocity" joint="right_flywheel_joint"/>
+    <jointvel name="feeder_velocity" joint="feeder_joint"/>
+
+    <actuatorfrc name="left_hip_effort" actuator="left_hip_torque"/>
+    <actuatorfrc name="left_knee_effort" actuator="left_knee_torque"/>
+    <actuatorfrc name="right_hip_effort" actuator="right_hip_torque"/>
+    <actuatorfrc name="right_knee_effort" actuator="right_knee_torque"/>
+    <actuatorfrc name="left_wheel_effort" actuator="left_wheel_torque"/>
+    <actuatorfrc name="right_wheel_effort" actuator="right_wheel_torque"/>
+    <actuatorfrc name="gimbal_yaw_effort" actuator="gimbal_yaw_torque"/>
+    <actuatorfrc name="gimbal_pitch_effort" actuator="gimbal_pitch_torque"/>
+    <actuatorfrc name="left_flywheel_effort" actuator="left_flywheel_torque"/>
+    <actuatorfrc name="right_flywheel_effort" actuator="right_flywheel_torque"/>
+    <actuatorfrc name="feeder_effort" actuator="feeder_torque"/>
+
+    <touch name="front_armor_hit" site="front_armor_site"/>
+    <touch name="rear_armor_hit" site="rear_armor_site"/>
+    <touch name="left_armor_hit" site="left_armor_site"/>
+    <touch name="right_armor_hit" site="right_armor_site"/>
+  </sensor>
+
+  <keyframe>
+    <key name="home" qpos="0 0 0.515 1 0 0 0 0.35 -0.70 0 0.35 -0.70 0 0 0 0 0 0"/>
+  </keyframe>
+</mujoco>

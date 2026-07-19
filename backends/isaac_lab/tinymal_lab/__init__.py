@@ -11,6 +11,9 @@ Importing this package registers:
     Isaac-Velocity-Flat-SerialWheelLegged-v0
     Isaac-Velocity-Flat-SerialWheelLegged-Play-v0
     Isaac-Velocity-Robust-SerialWheelLegged-v0
+    Isaac-Velocity-Flat-Sentinel-v0
+    Isaac-Velocity-Flat-Sentinel-Play-v0
+    Isaac-Velocity-Robust-Sentinel-v0
     Isaac-InvertedPendulum-1-Direct-v0
     Isaac-InvertedPendulum-2-Direct-v0
     Isaac-InvertedPendulum-3-Direct-v0
@@ -144,6 +147,48 @@ def _register():
             "rsl_rl_cfg_entry_point": (
                 f"{agents.__name__}.rsl_rl_wheel_legged_ppo_cfg:"
                 "WheelLeggedFlatPPORunnerCfg"
+            ),
+        },
+    )
+    gym.register(
+        id="Isaac-Velocity-Flat-Sentinel-v0",
+        entry_point="isaaclab.envs:ManagerBasedRLEnv",
+        disable_env_checker=True,
+        kwargs={
+            "env_cfg_entry_point": (
+                f"{__name__}.sentinel_env_cfg:SentinelFlatEnvCfg"
+            ),
+            "rsl_rl_cfg_entry_point": (
+                f"{agents.__name__}.rsl_rl_sentinel_ppo_cfg:"
+                "SentinelPPORunnerCfg"
+            ),
+        },
+    )
+    gym.register(
+        id="Isaac-Velocity-Flat-Sentinel-Play-v0",
+        entry_point="isaaclab.envs:ManagerBasedRLEnv",
+        disable_env_checker=True,
+        kwargs={
+            "env_cfg_entry_point": (
+                f"{__name__}.sentinel_env_cfg:SentinelFlatEnvCfg_PLAY"
+            ),
+            "rsl_rl_cfg_entry_point": (
+                f"{agents.__name__}.rsl_rl_sentinel_ppo_cfg:"
+                "SentinelPPORunnerCfg"
+            ),
+        },
+    )
+    gym.register(
+        id="Isaac-Velocity-Robust-Sentinel-v0",
+        entry_point="isaaclab.envs:ManagerBasedRLEnv",
+        disable_env_checker=True,
+        kwargs={
+            "env_cfg_entry_point": (
+                f"{__name__}.sentinel_env_cfg:SentinelRobustEnvCfg"
+            ),
+            "rsl_rl_cfg_entry_point": (
+                f"{agents.__name__}.rsl_rl_sentinel_ppo_cfg:"
+                "SentinelPPORunnerCfg"
             ),
         },
     )
