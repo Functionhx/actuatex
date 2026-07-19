@@ -25,6 +25,8 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
+from isaaclab.app import AppLauncher  # noqa: E402
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--ckpt",
@@ -59,7 +61,6 @@ parser.add_argument(
     default=0,
     help="fixed policy-step delay; robust source training sampled 1--3",
 )
-parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument(
     "--suite",
     action="store_true",
@@ -81,33 +82,60 @@ parser.add_argument("--actuator", choices=("explicit", "implicit"), default="exp
 parser.add_argument("--solver_position_iterations", type=int, default=4)
 parser.add_argument("--solver_velocity_iterations", type=int, default=0)
 parser.add_argument("--solver_type", type=int, choices=(0, 1), default=1)
-parser.add_argument("--contact_offset", type=float, default=0.01)
-parser.add_argument("--rest_offset", type=float, default=0.0)
-parser.add_argument("--replace_cylinders_with_capsules", action="store_true")
+parser.add_argument(
+    "--contact_offset",
+    type=float,
+    default=None,
+    help=(
+        "unsupported for the packaged instanceable capsule USD; selecting a value "
+        "requires a separately reviewed non-instanceable asset"
+    ),
+)
+parser.add_argument(
+    "--rest_offset",
+    type=float,
+    default=None,
+    help=(
+        "unsupported for the packaged instanceable capsule USD; selecting a value "
+        "requires a separately reviewed non-instanceable asset"
+    ),
+)
+parser.add_argument(
+    "--replace_cylinders_with_capsules",
+    action="store_true",
+    help=(
+        "legacy command compatibility only; the audited packaged asset always "
+        "contains four hip capsules"
+    ),
+)
 parser.add_argument(
     "--non_instanceable",
     action="store_true",
-    help="disable imported mesh instancing so collider contact offsets can be authored",
+    help=(
+        "legacy importer option; rejected for the audited packaged capsule USD"
+    ),
 )
 parser.add_argument("--external_forces_every_iteration", action="store_true")
 parser.add_argument("--positive_vx_gain", type=float, default=1.0)
 parser.add_argument("--negative_vx_gain", type=float, default=1.0)
 parser.add_argument("--vy_gain", type=float, default=1.0)
 parser.add_argument("--yaw_gain", type=float, default=1.0)
-args_cli, _ = parser.parse_known_args()
+AppLauncher.add_app_launcher_args(parser)
+args_cli, hydra_args = parser.parse_known_args()
+args_cli.headless = True
 
-# SimulationApp must be created before importing isaaclab. We keep it at module scope but the
-# script is meant to be run directly (not imported while another SimulationApp is alive).
-from isaacsim import SimulationApp  # noqa: E402
-simulation_app = SimulationApp({"headless": True})
+# AppLauncher selects Isaac Lab's Sim-6 experience and resolves the CUDA device
+# before the runtime-dependent imports below.
+sys.argv = [sys.argv[0]] + hydra_args
+app_launcher = AppLauncher(args_cli)
+simulation_app = app_launcher.app
 
 import gymnasium as gym  # noqa: E402
-import numpy as np  # noqa: E402
 import torch  # noqa: E402
 import torch.nn as nn  # noqa: E402
 
-import isaaclab.sim as sim_utils  # noqa: E402
-import isaaclab_tasks, tinymal_lab  # noqa: E402,F401
+import isaaclab_tasks  # noqa: E402,F401
+import tinymal_lab  # noqa: E402,F401
 from isaaclab.actuators import IdealPDActuatorCfg, ImplicitActuatorCfg  # noqa: E402
 from tinymal_lab.tinymal_flat_env_cfg import TinymalFlatEnvCfg  # noqa: E402
 from tinymal_lab.mdp import POLICY_JOINT_NAMES  # noqa: E402
@@ -174,17 +202,23 @@ def make_env(command, num_envs, device):
     cfg.scene.robot.spawn.rigid_props.solver_velocity_iteration_count = (
         args_cli.solver_velocity_iterations
     )
-    cfg.scene.robot.spawn.replace_cylinders_with_capsules = (
-        args_cli.replace_cylinders_with_capsules
-    )
-    cfg.scene.robot.spawn.make_instanceable = not args_cli.non_instanceable
+    # The Sim-5.1-equivalent capsule USD is now the default asset.  Keep the
+    # legacy flag so historical sweep commands remain reproducible.
     if args_cli.non_instanceable:
-        cfg.scene.robot.spawn.collision_props = sim_utils.CollisionPropertiesCfg(
-            contact_offset=args_cli.contact_offset,
-            rest_offset=args_cli.rest_offset,
+        raise ValueError(
+            "--non_instanceable is incompatible with the packaged instanceable "
+            "capsule USD. Generate and select a reviewed non-instanceable USD "
+            "through ACTUATEX_TINYMAL_USD before changing collider offsets."
         )
-    cfg.sim.physx.solver_type = args_cli.solver_type
-    cfg.sim.physx.enable_external_forces_every_iteration = (
+    if args_cli.contact_offset is not None or args_cli.rest_offset is not None:
+        raise ValueError(
+            "contact/rest offset overrides cannot be authored through the packaged "
+            "instanceable capsule USD. Leaving both options unset preserves the "
+            "audited asset and PhysX defaults; use a separately reviewed "
+            "non-instanceable USD for an offset A/B experiment."
+        )
+    cfg.sim.physics.solver_type = args_cli.solver_type
+    cfg.sim.physics.enable_external_forces_every_iteration = (
         args_cli.external_forces_every_iteration
     )
     # Deterministic eval: kill noise / pushes / friction jitter; pin a constant forward cmd.
@@ -281,16 +315,18 @@ def run_suite(env, actor, obs):
                     robot_data = env.unwrapped.scene["robot"].data
                     actual = torch.stack(
                         (
-                            robot_data.root_lin_vel_b[:, 0],
-                            robot_data.root_lin_vel_b[:, 1],
-                            robot_data.root_ang_vel_b[:, 2],
+                            robot_data.root_lin_vel_b.torch[:, 0],
+                            robot_data.root_lin_vel_b.torch[:, 1],
+                            robot_data.root_ang_vel_b.torch[:, 2],
                         ),
                         dim=1,
                     )
                     target = torch.tensor(command, device=actual.device).unsqueeze(0)
                     sq_error_sum += torch.square(actual - target).sum(dim=0)
                     sample_count += actual.shape[0]
-                    base_height_sum += float(robot_data.root_pos_w[:, 2].sum().item())
+                    base_height_sum += float(
+                        robot_data.root_pos_w.torch[:, 2].sum().item()
+                    )
             rmse = torch.sqrt(sq_error_sum / max(1, sample_count))
             summary[name] = {
                 "command": list(command),
@@ -336,9 +372,9 @@ def run_single(env, actor, obs, command):
             robot_data = env.unwrapped.scene["robot"].data
             actual = torch.stack(
                 (
-                    robot_data.root_lin_vel_b[:, 0],
-                    robot_data.root_lin_vel_b[:, 1],
-                    robot_data.root_ang_vel_b[:, 2],
+                    robot_data.root_lin_vel_b.torch[:, 0],
+                    robot_data.root_lin_vel_b.torch[:, 1],
+                    robot_data.root_ang_vel_b.torch[:, 2],
                 ),
                 dim=1,
             )
@@ -458,7 +494,10 @@ def main():
             "solver_type": args_cli.solver_type,
             "contact_offset": args_cli.contact_offset,
             "rest_offset": args_cli.rest_offset,
-            "replace_cylinders_with_capsules": args_cli.replace_cylinders_with_capsules,
+            "collision_offset_source": "packaged USD / PhysX defaults",
+            "collision_geometry": "audited packaged USD: 4 capsules, 0 cylinders",
+            "replace_cylinders_with_capsules": True,
+            "legacy_replace_flag_supplied": args_cli.replace_cylinders_with_capsules,
             "make_instanceable": not args_cli.non_instanceable,
             "external_forces_every_iteration": args_cli.external_forces_every_iteration,
         },

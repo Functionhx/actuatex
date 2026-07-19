@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MuJoCo twin of the original ActuateX serial wheel-legged URDF.
+
+  The dimensions, masses, inertias, joint axes and limits intentionally match
+  ../urdf/actuatex_serial_wheel_legged.urdf.  Actuator gains are not baked into
+  this asset: wheel_legged_sim2sim.py computes the same clipped mixed PD law as
+  Isaac Lab at every 5 ms physics tick.
+-->
+<mujoco model="actuatex_serial_wheel_legged">
+  <compiler angle="radian" autolimits="true" inertiafromgeom="false"/>
+  <option timestep="0.005" gravity="0 0 -9.81" integrator="implicitfast"
+          cone="elliptic" impratio="10" iterations="50" ls_iterations="10"/>
+  <visual>
+    <global offwidth="1280" offheight="720"/>
+    <quality shadowsize="2048"/>
+  </visual>
+
+  <default>
+    <joint damping="0"/>
+    <default class="leg_joint">
+      <joint type="hinge" axis="0 1 0" armature="0.01"
+             frictionloss="0.02" limited="true"/>
+    </default>
+    <default class="wheel_joint">
+      <joint type="hinge" axis="0 1 0" armature="0.02"
+             frictionloss="0" limited="false"/>
+    </default>
+    <!-- Robot geoms collide with the floor but not with one another. -->
+    <default class="robot_collision">
+      <geom contype="1" conaffinity="0" condim="6"
+            friction="1.0 0.005 0.0001" solref="0.02 1"
+            solimp="0.9 0.95 0.001" margin="0.001"/>
+    </default>
+    <default class="robot_visual">
+      <geom contype="0" conaffinity="0" group="2"/>
+    </default>
+  </default>
+
+  <asset>
+    <material name="actuatex_orange" rgba="1.0 0.30 0.04 1.0"/>
+    <material name="graphite" rgba="0.075 0.085 0.10 1.0"/>
+    <material name="metal" rgba="0.48 0.53 0.58 1.0"/>
+    <material name="floor_material" rgba="0.17 0.19 0.22 1.0"/>
+  </asset>
+
+  <worldbody>
+    <light name="key_light" pos="1 -2 4" dir="-0.2 0.3 -1" diffuse="0.9 0.9 0.9"/>
+    <light name="fill_light" pos="-2 2 2.5" dir="0.4 -0.3 -1" diffuse="0.35 0.38 0.45"/>
+    <geom name="floor" type="plane" size="0 0 0.1" material="floor_material"
+          contype="0" conaffinity="1" condim="6"
+          friction="1.0 0.005 0.0001" solref="0.02 1"
+          solimp="0.9 0.95 0.001"/>
+
+    <body name="base_link" pos="0 0 0.50">
+      <freejoint name="root"/>
+      <inertial pos="0 0 0" mass="8.8" diaginertia="0.07627 0.11381 0.15253"/>
+      <geom name="base_collision" class="robot_collision" type="box"
+            size="0.18 0.14 0.08" material="graphite"/>
+      <geom name="top_plate_visual" class="robot_visual" type="box"
+            pos="0.03 0 0.086" size="0.11 0.10 0.006"
+            material="actuatex_orange"/>
+      <site name="imu_site" pos="0 0 0" size="0.008" rgba="0.2 0.8 1 1"/>
+
+      <body name="left_upper_link" pos="0 0.17 -0.05">
+        <joint name="left_hip_joint" class="leg_joint" range="-1.0 1.0"/>
+        <inertial pos="0 0 -0.075" mass="0.16"
+                  diaginertia="0.000327 0.000321 0.000048"/>
+        <geom name="left_upper_collision" class="robot_collision" type="box"
+              pos="0 0 -0.075" size="0.020 0.0225 0.075"
+              material="actuatex_orange"/>
+
+        <body name="left_lower_link" pos="0 0 -0.15">
+          <joint name="left_knee_joint" class="leg_joint" range="-1.5 0.2"/>
+          <inertial pos="0 0 -0.125" mass="0.36"
+                    diaginertia="0.001923 0.001923 0.000096"/>
+          <geom name="left_lower_collision" class="robot_collision" type="box"
+                pos="0 0 -0.125" size="0.020 0.020 0.125" material="metal"/>
+
+          <body name="left_wheel_link" pos="0 0 -0.25">
+            <joint name="left_wheel_joint" class="wheel_joint"/>
+            <inertial pos="0 0 0" mass="1.22"
+                      diaginertia="0.001643 0.002779 0.001643"/>
+            <geom name="left_wheel_collision" class="robot_collision"
+                  type="cylinder" size="0.0675 0.025"
+                  quat="0.7071067811865476 0.7071067811865475 0 0"
+                  material="graphite"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="right_upper_link" pos="0 -0.17 -0.05">
+        <joint name="right_hip_joint" class="leg_joint" range="-1.0 1.0"/>
+        <inertial pos="0 0 -0.075" mass="0.16"
+                  diaginertia="0.000327 0.000321 0.000048"/>
+        <geom name="right_upper_collision" class="robot_collision" type="box"
+              pos="0 0 -0.075" size="0.020 0.0225 0.075"
+              material="actuatex_orange"/>
+
+        <body name="right_lower_link" pos="0 0 -0.15">
+          <joint name="right_knee_joint" class="leg_joint" range="-1.5 0.2"/>
+          <inertial pos="0 0 -0.125" mass="0.36"
+                    diaginertia="0.001923 0.001923 0.000096"/>
+          <geom name="right_lower_collision" class="robot_collision" type="box"
+                pos="0 0 -0.125" size="0.020 0.020 0.125" material="metal"/>
+
+          <body name="right_wheel_link" pos="0 0 -0.25">
+            <joint name="right_wheel_joint" class="wheel_joint"/>
+            <inertial pos="0 0 0" mass="1.22"
+                      diaginertia="0.001643 0.002779 0.001643"/>
+            <geom name="right_wheel_collision" class="robot_collision"
+                  type="cylinder" size="0.0675 0.025"
+                  quat="0.7071067811865476 0.7071067811865475 0 0"
+                  material="graphite"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- Actuator order is the public policy action contract. -->
+  <actuator>
+    <motor name="left_hip_torque" joint="left_hip_joint" gear="1"
+           ctrllimited="true" ctrlrange="-30 30"/>
+    <motor name="left_knee_torque" joint="left_knee_joint" gear="1"
+           ctrllimited="true" ctrlrange="-30 30"/>
+    <motor name="right_hip_torque" joint="right_hip_joint" gear="1"
+           ctrllimited="true" ctrlrange="-30 30"/>
+    <motor name="right_knee_torque" joint="right_knee_joint" gear="1"
+           ctrllimited="true" ctrlrange="-30 30"/>
+    <motor name="left_wheel_torque" joint="left_wheel_joint" gear="1"
+           ctrllimited="true" ctrlrange="-12 12"/>
+    <motor name="right_wheel_torque" joint="right_wheel_joint" gear="1"
+           ctrllimited="true" ctrlrange="-12 12"/>
+  </actuator>
+</mujoco>

@@ -1,0 +1,165 @@
+#usda 1.0
+(
+    defaultPrim = "Mid360Visual"
+    doc = "Open, visual-only Mid-360 teaching shell; optical origin is (0, 0, 0)."
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "Mid360Visual"
+{
+    def Scope "Looks"
+    {
+        def Material "Body"
+        {
+            token outputs:surface.connect = </Mid360Visual/Looks/Body/Shader.outputs:surface>
+
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.36, 0.39, 0.42)
+                float inputs:metallic = 0.5
+                float inputs:roughness = 0.34
+                token outputs:surface
+            }
+        }
+
+        def Material "DarkGlass"
+        {
+            token outputs:surface.connect = </Mid360Visual/Looks/DarkGlass/Shader.outputs:surface>
+
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.012, 0.016, 0.022)
+                float inputs:metallic = 0.1
+                float inputs:roughness = 0.16
+                token outputs:surface
+            }
+        }
+
+        def Material "Trim"
+        {
+            token outputs:surface.connect = </Mid360Visual/Looks/Trim/Shader.outputs:surface>
+
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.055, 0.064, 0.072)
+                float inputs:metallic = 0.3
+                float inputs:roughness = 0.42
+                token outputs:surface
+            }
+        }
+
+        def Material "StatusGreen"
+        {
+            token outputs:surface.connect = </Mid360Visual/Looks/StatusGreen/Shader.outputs:surface>
+
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.02, 0.22, 0.04)
+                color3f inputs:emissiveColor = (0.03, 0.75, 0.08)
+                float inputs:roughness = 0.25
+                token outputs:surface
+            }
+        }
+    }
+
+    # Livox's drawing places optical origin O 47 mm above the bottom face.
+    def Cube "LowerBody"
+    {
+        rel material:binding = </Mid360Visual/Looks/Body>
+        double size = 2
+        double3 xformOp:scale = (0.0325, 0.0325, 0.019)
+        double3 xformOp:translate = (0, 0, -0.028)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Cylinder "OpticalDome"
+    {
+        rel material:binding = </Mid360Visual/Looks/DarkGlass>
+        uniform token axis = "Z"
+        double height = 0.020
+        double radius = 0.030
+        double3 xformOp:translate = (0, 0, 0.001)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Cylinder "DomeTop"
+    {
+        rel material:binding = </Mid360Visual/Looks/Trim>
+        uniform token axis = "Z"
+        double height = 0.004
+        double radius = 0.025
+        double3 xformOp:translate = (0, 0, 0.011)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Cylinder "DomeRing"
+    {
+        rel material:binding = </Mid360Visual/Looks/Trim>
+        uniform token axis = "Z"
+        double height = 0.003
+        double radius = 0.032
+        double3 xformOp:translate = (0, 0, -0.0085)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Cube "BottomPlate"
+    {
+        rel material:binding = </Mid360Visual/Looks/Trim>
+        double size = 2
+        double3 xformOp:scale = (0.029, 0.029, 0.002)
+        double3 xformOp:translate = (0, 0, -0.045)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Cube "RearConnector"
+    {
+        rel material:binding = </Mid360Visual/Looks/Trim>
+        double size = 2
+        double3 xformOp:scale = (0.003, 0.011, 0.009)
+        double3 xformOp:translate = (-0.035, 0, -0.029)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Cube "FrontBadge"
+    {
+        rel material:binding = </Mid360Visual/Looks/Trim>
+        double size = 2
+        double3 xformOp:scale = (0.0008, 0.014, 0.006)
+        double3 xformOp:translate = (0.0330, 0, -0.028)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+
+    def Sphere "StatusLed"
+    {
+        rel material:binding = </Mid360Visual/Looks/StatusGreen>
+        double radius = 0.0016
+        double3 xformOp:translate = (0.034, 0.019, -0.039)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Xform "CoolingRibs"
+    {
+        def Cube "RibLeft"
+        {
+            rel material:binding = </Mid360Visual/Looks/Trim>
+            double size = 2
+            double3 xformOp:scale = (0.012, 0.0012, 0.012)
+            double3 xformOp:translate = (-0.006, 0.033, -0.028)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        }
+
+        def Cube "RibRight"
+        {
+            rel material:binding = </Mid360Visual/Looks/Trim>
+            double size = 2
+            double3 xformOp:scale = (0.012, 0.0012, 0.012)
+            double3 xformOp:translate = (-0.006, -0.033, -0.028)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        }
+    }
+}

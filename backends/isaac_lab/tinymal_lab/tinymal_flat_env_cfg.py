@@ -7,11 +7,7 @@
 import math
 
 import isaaclab.sim as sim_utils
-from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import (
-    ActionTermCfg as ActionTerm,
-    CommandTermCfg,
-    CurriculumTermCfg as CurrTerm,
     EventTermCfg as EventTerm,
     ObservationGroupCfg as ObsGroup,
     ObservationTermCfg as ObsTerm,
@@ -19,22 +15,21 @@ from isaaclab.managers import (
     SceneEntityCfg,
     TerminationTermCfg as DoneTerm,
 )
-from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.assets import AssetBaseCfg
 from isaaclab.sensors import ContactSensorCfg
+from isaaclab.sim import SimulationCfg
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import UniformNoiseCfg as Unoise
+from isaaclab_physx.physics import PhysxCfg
+from isaaclab_physx.sim.spawners.materials import RigidBodyMaterialCfg
 
 from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import (
     LocomotionVelocityRoughEnvCfg,
     CommandsCfg as BaseCommandsCfg,
-    EventCfg as BaseEventCfg,
+    EventsCfg as BaseEventCfg,
 )
 from isaaclab_tasks.manager_based.locomotion.velocity import mdp as base_mdp
-from isaaclab_tasks.manager_based.locomotion.velocity.config.go2.agents.rsl_rl_ppo_cfg import (
-    UnitreeGo2RoughPPORunnerCfg,
-)
 
 from .tinymal_cfg import TINYMAL_CFG
 from . import mdp as tinymal_mdp
@@ -178,6 +173,13 @@ class TinymalEventCfg(BaseEventCfg):
 class TinymalFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
     """TinyMal flat-terrain velocity tracking (1:1 port of the Isaac Gym baseline task)."""
 
+    # Pin PhysX explicitly for the 6.0.1 migration. Isaac Lab 3 also exposes
+    # Newton presets, but changing both simulator version and physics backend in
+    # one experiment would make regression attribution impossible.
+    sim: SimulationCfg = SimulationCfg(
+        physics=PhysxCfg(gpu_max_rigid_patch_count=10 * 2**15)
+    )
+
     # Replace the MDP manager configs wholesale so nothing inherited leaks through.
     observations: TinymalObservationsCfg = TinymalObservationsCfg()
     actions: TinymalActionsCfg = TinymalActionsCfg()
@@ -196,7 +198,7 @@ class TinymalFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
             prim_path="/World/ground",
             terrain_type="plane",
             collision_group=-1,
-            physics_material=sim_utils.RigidBodyMaterialCfg(
+            physics_material=RigidBodyMaterialCfg(
                 friction_combine_mode="multiply",
                 restitution_combine_mode="multiply",
                 static_friction=1.0,

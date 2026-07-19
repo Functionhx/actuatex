@@ -46,13 +46,13 @@ COMMANDS_SCALE = (2.0, 2.0, 0.25)
 def base_lin_vel_scaled(env, scale: float = SCALE_LIN_VEL,
                         asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     asset: RigidObject = env.scene[asset_cfg.name]
-    return asset.data.root_lin_vel_b[:, :3] * scale
+    return asset.data.root_lin_vel_b.torch[:, :3] * scale
 
 
 def base_ang_vel_scaled(env, scale: float = SCALE_ANG_VEL,
                         asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     asset: RigidObject = env.scene[asset_cfg.name]
-    return asset.data.root_ang_vel_b[:, :3] * scale
+    return asset.data.root_ang_vel_b.torch[:, :3] * scale
 
 
 def joint_vel_scaled(env, scale: float = SCALE_DOF_VEL,
@@ -60,13 +60,19 @@ def joint_vel_scaled(env, scale: float = SCALE_DOF_VEL,
     asset: Articulation = env.scene[asset_cfg.name]
     joint_ids = asset_cfg.joint_ids
     # default joint vel is zero -> relative == absolute, but keep the subtraction for safety.
-    return (asset.data.joint_vel[:, joint_ids] - asset.data.default_joint_vel[:, joint_ids]) * scale
+    return (
+        asset.data.joint_vel.torch[:, joint_ids]
+        - asset.data.default_joint_vel.torch[:, joint_ids]
+    ) * scale
 
 
 def joint_pos_rel_policy(env, asset_cfg: SceneEntityCfg = POLICY_JOINT_CFG) -> torch.Tensor:
     asset: Articulation = env.scene[asset_cfg.name]
     joint_ids = asset_cfg.joint_ids
-    return asset.data.joint_pos[:, joint_ids] - asset.data.default_joint_pos[:, joint_ids]
+    return (
+        asset.data.joint_pos.torch[:, joint_ids]
+        - asset.data.default_joint_pos.torch[:, joint_ids]
+    )
 
 
 def last_action_policy(env, action_name: str = "joint_pos") -> torch.Tensor:
@@ -87,7 +93,9 @@ def velocity_tracking_l2(env, command_name: str = "base_velocity",
     """Squared planar tracking error with a non-saturating gradient at zero velocity."""
     asset: RigidObject = env.scene[asset_cfg.name]
     command = env.command_manager.get_command(command_name)[:, :2]
-    return torch.sum(torch.square(command - asset.data.root_lin_vel_b[:, :2]), dim=1)
+    return torch.sum(
+        torch.square(command - asset.data.root_lin_vel_b.torch[:, :2]), dim=1
+    )
 
 
 def yaw_velocity_tracking_l2(env, command_name: str = "base_velocity",
@@ -95,7 +103,7 @@ def yaw_velocity_tracking_l2(env, command_name: str = "base_velocity",
     """Dense yaw-rate tracking error; avoids saturation of the exponential objective."""
     asset: RigidObject = env.scene[asset_cfg.name]
     command = env.command_manager.get_command(command_name)[:, 2]
-    return torch.square(command - asset.data.root_ang_vel_b[:, 2])
+    return torch.square(command - asset.data.root_ang_vel_b.torch[:, 2])
 
 
 def commanded_planar_progress(env, command_name: str = "base_velocity",
@@ -105,7 +113,7 @@ def commanded_planar_progress(env, command_name: str = "base_velocity",
     command = env.command_manager.get_command(command_name)[:, :2]
     command_norm = torch.linalg.vector_norm(command, dim=1, keepdim=True)
     direction = command / torch.clamp(command_norm, min=1.0e-6)
-    progress = torch.sum(asset.data.root_lin_vel_b[:, :2] * direction, dim=1)
+    progress = torch.sum(asset.data.root_lin_vel_b.torch[:, :2] * direction, dim=1)
     return torch.clamp(progress, min=-1.0, max=1.0) * (command_norm[:, 0] > 0.1)
 
 
@@ -118,11 +126,11 @@ def configure_stair_cells(env, env_ids, flat_fraction: float = 0.5,
         return
     for asset_name in stair_asset_names:
         asset: RigidObject = env.scene[asset_name]
-        pose = asset.data.default_root_state[flat_env_ids, :7].clone()
+        pose = asset.data.default_root_state.torch[flat_env_ids, :7].clone()
         pose[:, 2] = -2.0
-        asset.write_root_pose_to_sim(pose, env_ids=flat_env_ids)
-        asset.write_root_velocity_to_sim(
-            torch.zeros(flat_env_ids.numel(), 6, device=env.device),
+        asset.write_root_pose_to_sim_index(root_pose=pose, env_ids=flat_env_ids)
+        asset.write_root_velocity_to_sim_index(
+            root_velocity=torch.zeros(flat_env_ids.numel(), 6, device=env.device),
             env_ids=flat_env_ids,
         )
 
@@ -133,11 +141,11 @@ def stair_height_below_base(env, start_x: float = 0.65, step_width: float = 0.14
                             first_step_asset: str = "stair_step_1") -> torch.Tensor:
     asset: RigidObject = env.scene[first_step_asset]
     robot: Articulation = env.scene["robot"]
-    local_xy = robot.data.root_pos_w[:, :2] - env.scene.env_origins[:, :2]
+    local_xy = robot.data.root_pos_w.torch[:, :2] - env.scene.env_origins[:, :2]
     level = torch.floor((local_xy[:, 0] - start_x) / step_width) + 1.0
     level = torch.clamp(level, min=0.0, max=float(num_steps))
     inside = torch.abs(local_xy[:, 1]) <= corridor_half_width
-    staircase_enabled = asset.data.root_pos_w[:, 2] > -1.0
+    staircase_enabled = asset.data.root_pos_w.torch[:, 2] > -1.0
     return level * step_height * inside * staircase_enabled
 
 
@@ -156,7 +164,11 @@ def stair_relative_base_height_l2(
         env, start_x, step_width, step_height, num_steps,
         corridor_half_width, first_step_asset
     )
-    relative_height = robot.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2] - terrain_height
+    relative_height = (
+        robot.data.root_pos_w.torch[:, 2]
+        - env.scene.env_origins[:, 2]
+        - terrain_height
+    )
     return torch.square(relative_height - target_height)
 
 
@@ -203,14 +215,14 @@ def stair_swing_foot_clearance_l2(
     robot: Articulation = env.scene[asset_cfg.name]
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
 
-    foot_pos_w = robot.data.body_pos_w[:, asset_cfg.body_ids, :]
+    foot_pos_w = robot.data.body_pos_w.torch[:, asset_cfg.body_ids, :]
     local_x = foot_pos_w[:, :, 0] - env.scene.env_origins[:, 0].unsqueeze(1)
     local_y = foot_pos_w[:, :, 1] - env.scene.env_origins[:, 1].unsqueeze(1)
     level = torch.floor((local_x - start_x) / step_width) + 1.0
     level = torch.clamp(level, min=0.0, max=float(num_steps))
     inside = torch.abs(local_y) <= corridor_half_width
     staircase_enabled = (
-        env.scene[first_step_asset].data.root_pos_w[:, 2] > -1.0
+        env.scene[first_step_asset].data.root_pos_w.torch[:, 2] > -1.0
     ).unsqueeze(1)
     terrain_height = level * step_height * inside * staircase_enabled
     foot_height = (
@@ -219,14 +231,16 @@ def stair_swing_foot_clearance_l2(
         - terrain_height
     )
 
-    force_history = contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, :]
+    force_history = contact_sensor.data.net_forces_w_history.torch[
+        :, :, sensor_cfg.body_ids, :
+    ]
     peak_force = torch.linalg.vector_norm(force_history, dim=-1).amax(dim=1)
     swing = peak_force < contact_threshold
     clearance_deficit = torch.clamp(target_clearance - foot_height, min=0.0)
 
     command = env.command_manager.get_command(command_name)
     moving_forward = command[:, 0] > 0.1
-    base_local_x = robot.data.root_pos_w[:, 0] - env.scene.env_origins[:, 0]
+    base_local_x = robot.data.root_pos_w.torch[:, 0] - env.scene.env_origins[:, 0]
     near_course = (base_local_x >= start_x - 0.30) & (
         base_local_x <= start_x + num_steps * step_width + 0.30
     )
@@ -237,8 +251,10 @@ def stair_swing_foot_clearance_l2(
 def stair_course_complete(env, threshold_x: float = 1.55,
                           first_step_asset: str = "stair_step_1") -> torch.Tensor:
     robot: Articulation = env.scene["robot"]
-    local_x = robot.data.root_pos_w[:, 0] - env.scene.env_origins[:, 0]
-    staircase_enabled = env.scene[first_step_asset].data.root_pos_w[:, 2] > -1.0
+    local_x = robot.data.root_pos_w.torch[:, 0] - env.scene.env_origins[:, 0]
+    staircase_enabled = (
+        env.scene[first_step_asset].data.root_pos_w.torch[:, 2] > -1.0
+    )
     return (local_x >= threshold_x) & staircase_enabled
 
 
@@ -246,7 +262,7 @@ def joint_torques_scaled(env, scale: float = 1.0 / 12.0,
                          asset_cfg: SceneEntityCfg = POLICY_JOINT_CFG) -> torch.Tensor:
     """Applied joint torques for the asymmetric critic, in policy order."""
     asset: Articulation = env.scene[asset_cfg.name]
-    return asset.data.applied_torque[:, asset_cfg.joint_ids] * scale
+    return asset.data.applied_torque.torch[:, asset_cfg.joint_ids] * scale
 
 
 def foot_contact_state(env, threshold: float = 1.0,
@@ -257,7 +273,9 @@ def foot_contact_state(env, threshold: float = 1.0,
                        )) -> torch.Tensor:
     """Binary foot contacts in FL, FR, RL, RR order for the privileged critic."""
     sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
-    force_history = sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, :]
+    force_history = sensor.data.net_forces_w_history.torch[
+        :, :, sensor_cfg.body_ids, :
+    ]
     peak_force = torch.linalg.vector_norm(force_history, dim=-1).amax(dim=1)
     return (peak_force > threshold).to(dtype=peak_force.dtype)
 
@@ -278,7 +296,11 @@ def stair_relative_base_height(
         env, start_x, step_width, step_height, num_steps,
         corridor_half_width, first_step_asset
     )
-    relative_height = robot.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2] - terrain_height
+    relative_height = (
+        robot.data.root_pos_w.torch[:, 2]
+        - env.scene.env_origins[:, 2]
+        - terrain_height
+    )
     return (relative_height - target_height).unsqueeze(-1)
 
 

@@ -20,7 +20,9 @@ DEFAULT_CHECKPOINT = ARTIFACTS_ROOT / "checkpoints" / "isaac_gym" / "model.pt"
 DEFAULT_OUTPUT = ARTIFACTS_ROOT / "isaac_lab" / "transfer_grid"
 
 
-EXACT_IMPORT = ["--replace_cylinders_with_capsules", "--non_instanceable"]
+# Isaac Sim 6 removed importer-time cylinder replacement.  Every candidate in
+# this sweep uses the same audited 4-capsule USD selected by the task config.
+# Geometry is therefore held constant while actuator and timing parameters vary.
 MEAN_DYNAMICS = ["--armature", "0.01", "--joint_friction", "0.05"]
 GYM_GAINS = [
     "--positive_vx_gain", "1.5",
@@ -29,53 +31,46 @@ GYM_GAINS = [
 ]
 
 CANDIDATES = [
-    ("historical_d0", []),
-    ("exact_import_d0", EXACT_IMPORT),
-    ("exact_import_d1", EXACT_IMPORT + ["--action_delay", "1"]),
-    ("exact_import_d2", EXACT_IMPORT + ["--action_delay", "2"]),
-    ("exact_import_d3", EXACT_IMPORT + ["--action_delay", "3"]),
-    ("mean_dyn_d1", EXACT_IMPORT + MEAN_DYNAMICS + ["--action_delay", "1"]),
-    ("mean_dyn_d2", EXACT_IMPORT + MEAN_DYNAMICS + ["--action_delay", "2"]),
+    ("capsule_d0", []),
+    ("capsule_d1", ["--action_delay", "1"]),
+    ("capsule_d2", ["--action_delay", "2"]),
+    ("capsule_d3", ["--action_delay", "3"]),
+    ("mean_dyn_d1", MEAN_DYNAMICS + ["--action_delay", "1"]),
+    ("mean_dyn_d2", MEAN_DYNAMICS + ["--action_delay", "2"]),
     (
         "mean_dyn_solver_d1",
-        EXACT_IMPORT
-        + MEAN_DYNAMICS
+        MEAN_DYNAMICS
         + [
             "--action_delay", "1",
             "--solver_velocity_iterations", "1",
             "--external_forces_every_iteration",
         ],
     ),
-    ("mean_dyn_gym_gains_d1", EXACT_IMPORT + MEAN_DYNAMICS + GYM_GAINS + ["--action_delay", "1"]),
-    ("mean_dyn_gym_gains_d2", EXACT_IMPORT + MEAN_DYNAMICS + GYM_GAINS + ["--action_delay", "2"]),
+    ("mean_dyn_gym_gains_d1", MEAN_DYNAMICS + GYM_GAINS + ["--action_delay", "1"]),
+    ("mean_dyn_gym_gains_d2", MEAN_DYNAMICS + GYM_GAINS + ["--action_delay", "2"]),
     (
         "soft_pd_d1",
-        EXACT_IMPORT
-        + MEAN_DYNAMICS
+        MEAN_DYNAMICS
         + ["--kp", "15", "--kd", "0.35", "--action_delay", "1"],
     ),
     (
         "stiff_pd_d1",
-        EXACT_IMPORT
-        + MEAN_DYNAMICS
+        MEAN_DYNAMICS
         + ["--kp", "25", "--kd", "0.7", "--action_delay", "1"],
     ),
     (
         "scale_0p20_d1",
-        EXACT_IMPORT
-        + MEAN_DYNAMICS
+        MEAN_DYNAMICS
         + ["--action_scale", "0.20", "--action_delay", "1"],
     ),
     (
         "scale_0p30_d1",
-        EXACT_IMPORT
-        + MEAN_DYNAMICS
+        MEAN_DYNAMICS
         + ["--action_scale", "0.30", "--action_delay", "1"],
     ),
     (
         "implicit_mean_d1",
-        EXACT_IMPORT
-        + MEAN_DYNAMICS
+        MEAN_DYNAMICS
         + ["--actuator", "implicit", "--action_delay", "1"],
     ),
 ]

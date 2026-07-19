@@ -6,14 +6,18 @@
 
 from isaaclab.utils import configclass
 from isaaclab_rl.rsl_rl import (
+    RslRlMLPModelCfg,
     RslRlOnPolicyRunnerCfg,
-    RslRlPpoActorCriticCfg,
     RslRlPpoAlgorithmCfg,
 )
 
 
 @configclass
 class TinymalFlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
+    # RSL-RL 5 no longer infers observation-set mappings.  The baseline actor
+    # and critic intentionally receive the same policy observations; the
+    # robust runner below overrides the critic mapping with privileged terms.
+    obs_groups = {"actor": ["policy"], "critic": ["policy"]}
     num_steps_per_env = 24            # legged_gym runner.num_steps_per_env
     max_iterations = 1500             # tinymal runner.max_iterations
     save_interval = 50                # tinymal runner.save_interval
@@ -21,13 +25,18 @@ class TinymalFlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     run_name = "port_seed1"
     clip_actions = 100.0             # legged_gym normalization.clip_actions
 
-    policy = RslRlPpoActorCriticCfg(
-        init_noise_std=0.3,           # tinymal override (base default is 1.0)
-        actor_obs_normalization=False,   # old rsl_rl did not empirically normalize obs
-        critic_obs_normalization=False,
-        actor_hidden_dims=[512, 256, 128],
-        critic_hidden_dims=[512, 256, 128],
+    actor = RslRlMLPModelCfg(
+        hidden_dims=[512, 256, 128],
         activation="elu",
+        obs_normalization=False,
+        distribution_cfg=RslRlMLPModelCfg.GaussianDistributionCfg(
+            init_std=0.3,
+        ),
+    )
+    critic = RslRlMLPModelCfg(
+        hidden_dims=[512, 256, 128],
+        activation="elu",
+        obs_normalization=False,
     )
     algorithm = RslRlPpoAlgorithmCfg(
         value_loss_coef=1.0,

@@ -18,6 +18,7 @@ rsl_rl/
 # Training and evaluation artifacts
 artifacts/
 logs/
+/log/
 runs/
 /checkpoints/
 evaluation/
@@ -37,6 +38,14 @@ wandb/
 *.usda
 *.usdc
 compiled_*.mjcf
+
+# Runtime-critical TinyMal capsule asset audited for the Isaac Sim 6 migration.
+# Keep the broad generated-USD rule above; only this pinned, hashed package is source data.
+!robots/tinymal/usd/capsule_compat/*.usd
+!robots/tinymal/usd/capsule_compat/configuration/*.usd
+
+# Open visual-only sensor shells are source assets, not generated stage dumps.
+!robots/sensors/mid360/usd/*.usda
 
 # Archives and local release packages
 *.zip

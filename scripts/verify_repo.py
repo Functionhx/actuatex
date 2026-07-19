@@ -50,6 +50,10 @@ REQUIRED = {
     "backends/isaac_lab/upstream.json",
 }
 IGNORED_PARTS = {".git", "_deps", "__pycache__", "artifacts"}
+LARGE_FILE_ALLOWLIST = {
+    # Audited binary crate required by the composed capsule-compatible USD.
+    Path("robots/tinymal/usd/capsule_compat/configuration/tinymal_base.usd"),
+}
 
 
 def main() -> int:
@@ -67,7 +71,7 @@ def main() -> int:
 
     for path in files:
         relative = path.relative_to(ROOT)
-        if path.stat().st_size > MAX_FILE_SIZE:
+        if path.stat().st_size > MAX_FILE_SIZE and relative not in LARGE_FILE_ALLOWLIST:
             errors.append(f"file exceeds 10 MiB: {relative}")
         if path.suffix.lower() in FORBIDDEN_SUFFIXES:
             errors.append(f"generated/binary artifact is not allowed: {relative}")
@@ -90,7 +94,9 @@ def main() -> int:
         try:
             json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
-            errors.append(f"invalid upstream manifest {path.relative_to(ROOT)}: {error}")
+            errors.append(
+                f"invalid upstream manifest {path.relative_to(ROOT)}: {error}"
+            )
 
     if errors:
         print("Repository verification failed:")
@@ -99,7 +105,9 @@ def main() -> int:
         return 1
 
     total_size = sum(path.stat().st_size for path in files)
-    print(f"Repository verification passed: {len(files)} files, {total_size / 1024 / 1024:.2f} MiB")
+    print(
+        f"Repository verification passed: {len(files)} files, {total_size / 1024 / 1024:.2f} MiB"
+    )
     return 0
 
 

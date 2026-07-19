@@ -72,7 +72,7 @@ They are not three names for the same product, and “newer” does not automati
 |---|---|---|---|
 | **MuJoCo** | The smallest complete loop for dynamics, actuators, rewards, and PPO | Native training, stair/push acceptance, bidirectional sim2sim | Starts on CPU; easiest to debug |
 | **Isaac Gym / PhysX 4** | Massive parallel sampling and classic legged-RL baselines | 4096-env training, robust task family, distillation, off-screen recording | Legacy standalone GPU simulator; high throughput |
-| **Isaac Lab + Isaac Sim / PhysX 5** | The current NVIDIA robotics workflow and richer scenes | Native Manager-Based tasks, symmetry, Gym-policy migration | Lab is the learning framework; Sim is the runtime and simulator |
+| **Isaac Lab + Isaac Sim / PhysX 5** | The current NVIDIA robotics workflow and richer scenes | Native Sim 6 training, RTX/ROS sensors, bidirectional Gym/MuJoCo transfer | Lab is the learning framework; Sim is the runtime and simulator |
 
 For a first robotics-RL project, follow **MuJoCo → Isaac Gym → Isaac Lab → sim2sim**. If your NVIDIA stack is already working, begin with the Gym baseline and use Lab plus MuJoCo to challenge transfer.
 
@@ -156,24 +156,31 @@ See the [Isaac Gym backend guide](./backends/isaac_gym/README.md) for the task f
 <details>
 <summary><strong>🟢 Isaac Lab + Isaac Sim: modern PhysX 5 workflow</strong></summary>
 
-Install a matching Isaac Sim / Isaac Lab stack through the official process, then pin the Isaac Lab revision tested by this project:
+Install Isaac Sim `6.0.1 GA` in a separate directory, then pin the matching official Isaac Lab tag (this Lab release is still beta):
 
 ```bash
-git clone https://github.com/isaac-sim/IsaacLab.git _deps/IsaacLab
-git -C _deps/IsaacLab checkout b4c321024792976150ca55fddb26fa34480d974e
+git clone https://github.com/isaac-sim/IsaacLab.git _deps/IsaacLab-3
+git -C _deps/IsaacLab-3 checkout v3.0.0-beta2.patch1
 
-python scripts/install_isaac_lab_compat.py --isaac-lab-root _deps/IsaacLab
-export ISAAC_SIM_PYTHON=/path/to/isaac-sim/python.sh
+python scripts/install_isaac_lab_compat.py \
+  --isaac-lab-root _deps/IsaacLab-3 \
+  --isaac-sim-root /path/to/isaac-sim-6.0.1 \
+  --link-runtime --verify-python
+
+cd _deps/IsaacLab-3
+./isaaclab.sh -i 'rl[rsl-rl]'
+cd ../..
 ```
 
 ```bash
-"$ISAAC_SIM_PYTHON" backends/isaac_lab/scripts/train_tinymal.py \
-  --task Isaac-Velocity-Native-Omni-TinyMal-v0 \
-  --num_envs 4096 --max_iterations 1500 \
-  --headless --seed 1
+_deps/IsaacLab-3/isaaclab.sh -p backends/isaac_lab/scripts/train_tinymal.py \
+  --task Isaac-Velocity-Native-Robust-TinyMal-v0 \
+  --num_envs 8192 --max_iterations 60 --seed 29 \
+  --learning_rate 1e-5 --schedule fixed \
+  --entropy_coef 2e-4 --init_noise_std 0.05
 ```
 
-See the [Isaac Lab / Isaac Sim backend guide](./backends/isaac_lab/README.md) for version details, old Gym-policy transfer, and recording commands.
+On the local RTX 4070 Ti SUPER, 8192 environments sustained roughly 153k–157k steps/s with a 15092 MiB VRAM peak (92.2%). See the [Isaac Lab / Isaac Sim backend guide](./backends/isaac_lab/README.md) for warm starts, old Gym-policy transfer, and recording commands. The [6.0.1 migration report](./docs/ISAAC_SIM_6_MIGRATION.zh-CN.md) contains the final training results and acceptance evidence.
 
 </details>
 
@@ -202,7 +209,7 @@ The recorder treats reaching the top, remaining centered, and staying upright as
 
 ## 🧭 From standing to cross-world transfer: learning path
 
-The repository can be taught as seven labs. Each lab has one concrete question, an entry point in the code, and a deliverable.
+The repository can be taught as eight labs. Each lab has one concrete question, an entry point in the code, and a deliverable.
 
 | Lab | Core question | Suggested entry | Deliverable |
 |---:|---|---|---|
@@ -213,6 +220,7 @@ The repository can be taught as seven labs. Each lab has one concrete question, 
 | **4 · Move frameworks** | Why does the same network behave differently in Isaac Lab? | [`mdp.py`](./backends/isaac_lab/tinymal_lab/mdp.py), [`tinymal_cfg.py`](./backends/isaac_lab/tinymal_lab/tinymal_cfg.py) | Observation/actuator alignment checklist |
 | **5 · Retrain in MuJoCo** | Why do solver choice, armature, and fixed learning rate matter? | [`model_builder.py`](./backends/mujoco/model_builder.py), [`train_mujoco.py`](./backends/mujoco/train_mujoco.py) | Native policy + hyperparameter ablation |
 | **6 · Defend with sim2sim** | Does success in the training simulator generalize? | [`compare_sim2sim.py`](./tools/sim2sim/compare_sim2sim.py) | Six commands, fall rate, RMSE, conclusion |
+| **7 · Control-method arena** | How can PID, LQG, MPC, LQR, and RL be compared fairly? | [`classical_control.py`](./tasks/inverted_pendulum/classical_control.py), [full benchmark report](./docs/INVERTED_PENDULUM_BENCHMARK.zh-CN.md), [method map](./docs/INVERTED_PENDULUM_CONTROL_METHODS.zh-CN.md) | Shared 1/2/3-link metrics + applicability analysis |
 
 An instructor can use the deliverable column directly as an acceptance checklist. A learner can begin with one backend and unlock transfer and robustness chapters gradually.
 
@@ -241,6 +249,19 @@ An instructor can use the deliverable column directly as an acceptance checklist
 | MuJoCo dynamics combinations | **16/16 no-fall** | No falls across combined mass/friction perturbations |
 | MuJoCo sustained pushes | **11/16 accepted** | Strong and unfavorable force directions remain weak |
 | Native Isaac Lab stair showcase | **64/64 success** | Showcase condition only, not strict randomized acceptance |
+| Sim 6 general robust refinement | **two-seed RMSE 0.09445 · 1.04% better** | Small but same-direction holdout gain with no reset regression |
+| Sim 6 robust stair refinement | **212/256 clean · 236/256 first-attempt** | Final `model10` under randomized conditions, not a showcase metric |
+| Sim 6 serial wheel-leg, 1024-env holdout | **7 falls · RMSE 0.09817** | 69.6% fewer falls than the 23-fall stage-one baseline |
+| Native 1/2/3-link pendulum PPO | **MuJoCo 100/99.98/40.87% · Isaac 100/100/49.51%** | Also includes 19+ control/estimation methods, a robustness matrix, and TVLQR swing-up; see the [full report](./docs/INVERTED_PENDULUM_BENCHMARK.zh-CN.md) |
+
+The final Sim 6 H.264 1280×720 PPT cut is generated at `artifacts/isaac_sim_6/videos/TinyMal_IsaacSim_6_FinalPolicy_Stairs_PPT.mp4`. Binary artifacts stay out of Git by default; the local `artifacts/isaac_sim_6/manifest.json` indexes parameters, hashes, and evidence.
+
+The repository now also includes an original 6-DOF serial two-wheel-leg robot. Its two-stage run collected 137.6 million transitions, randomized 0–20 ms actuator delay, passed a 1024-environment unseen-dynamics A/B test, and was exported to TorchScript. The [full wheel-legged report](./docs/WHEEL_LEGGED_RL.zh-CN.md) records project screening, mechanics, commands, unfavorable results, and deployment limits.
+
+<div align="center">
+  <img src="./docs/media/serial_wheel_legged_sim6.jpg" alt="ActuateX serial wheel-legged robot running in Isaac Sim 6" width="78%" />
+  <br /><sub>Real Sim 6 rollout frame; the clip covers forward, reverse, both yaw directions, and paired arcs with zero falls</sub>
+</div>
 
 The two Isaac Lab → MuJoCo falls are kept deliberately. They teach more than a cherry-picked checkpoint: matching tensor dimensions does not guarantee aligned frames, contacts, actuators, or solver semantics.
 
@@ -264,9 +285,12 @@ Build conclusions from four layers of evidence:
 | How is robustness trained? | [`tinymal_robust.py`](./backends/isaac_gym/overlay/legged_gym/envs/tinymal/tinymal_robust.py) | [`tinymal_robust_env_cfg.py`](./backends/isaac_lab/tinymal_lab/tinymal_robust_env_cfg.py) |
 | How can a new task retain an old gait? | [`0003-reference-policy-distillation.patch`](./backends/isaac_gym/patches/0003-reference-policy-distillation.patch) | [`train_tinymal_robust_transfer.py`](./backends/isaac_gym/overlay/legged_gym/scripts/train_tinymal_robust_transfer.py) |
 | How are checkpoints compared fairly? | [`compare_checkpoints.py`](./tools/checkpoints/compare_checkpoints.py) | [`compare_sim2sim.py`](./tools/sim2sim/compare_sim2sim.py) |
+| How are MID360 point angles and firing times preserved? | [`mid360_rtx.py`](./backends/isaac_lab/tinymal_lab/mid360_rtx.py) | [`validate_mid360_rtx.py`](./backends/isaac_lab/scripts/validate_mid360_rtx.py) |
+| How is the 6-DOF serial wheel-leg trained? | [`wheel_legged_env_cfg.py`](./backends/isaac_lab/tinymal_lab/wheel_legged_env_cfg.py) | [`WHEEL_LEGGED_RL.zh-CN.md`](./docs/WHEEL_LEGGED_RL.zh-CN.md) |
+| How does a humanoid policy align simulation and hardware order? | [`g1_29dof.py`](./tasks/locomotion/g1_29dof.py) | [`INDUSTRIAL_RL_STACK.zh-CN.md`](./docs/INDUSTRIAL_RL_STACK.zh-CN.md) |
 | What changed between Lab and Gym? | [`CODE_CHANGES_REPORT.zh-CN.md`](./docs/CODE_CHANGES_REPORT.zh-CN.md) | [`ActuateX_代码修改报告.pdf`](./docs/ActuateX_代码修改报告.pdf) |
 
-See the [architecture note](./docs/ARCHITECTURE.md) for the full design and the [code change report](./docs/CODE_CHANGES_REPORT.zh-CN.md) for a presentation-ready review of project modifications.
+See the [architecture note](./docs/ARCHITECTURE.md) and [industrial full-stack plan](./docs/INDUSTRIAL_RL_STACK.zh-CN.md) for the complete design, and the [code change report](./docs/CODE_CHANGES_REPORT.zh-CN.md) for a presentation-ready review of project modifications.
 
 <a id="repository-map"></a>
 
@@ -278,7 +302,13 @@ actuatex/
 │   ├── isaac_gym/       # TinyMal overlay, task family, auditable upstream patches
 │   ├── isaac_lab/       # native Isaac Lab environments, algorithm configs, scripts
 │   └── mujoco/          # model builder, vector env, native PPO, acceptance tests
-├── robots/tinymal/      # canonical URDF, meshes, and asset notice
+├── robots/
+│   ├── tinymal/         # quadruped URDF, meshes, and asset notice
+│   ├── wheel_legged/    # original 6-DOF serial two-wheel-leg URDF
+│   ├── g1/              # pinned official humanoid sources and 29-DOF notes
+│   └── sensors/         # MID360 appearance, scan table, and sensor assets
+├── tasks/               # backend-neutral control, observation, actuator, safety contracts
+├── navigation/          # ROS 2 Nav2 bridge, messages, and sensor configs
 ├── tools/
 │   ├── checkpoints/     # checkpoint comparison and weight blending
 │   └── sim2sim/         # policy loading, observation alignment, transfer evaluation
@@ -292,8 +322,9 @@ Large upstream projects belong in ignored `_deps/` checkouts, and runtime output
 <details>
 <summary><strong>🖥️ Environment count and VRAM: accelerate training instead of merely filling memory</strong></summary>
 
-- Begin Isaac Gym / Isaac Lab runs with `1024` or `2048` environments, observe steps/s and VRAM, then scale toward the `4096`-environment baseline while leaving room for evaluation, recording, and transient allocations.
+- Begin Isaac Gym / Isaac Lab runs with `1024` or `2048` environments, observe steps/s and VRAM, then scale in measured stages. The tested Sim 6 physics-only sweet spot on this machine is `8192`; do not copy it to camera/LiDAR workloads blindly.
 - A 100% VRAM reading is not the objective. GPU utilization, simulator throughput, PPO update time, OOM risk, and host swapping matter more.
+- Large contact workloads also require a larger PhysX found/lost-pair buffer; ActuateX sizes it to a safe power of two from the environment count.
 - The current MuJoCo backend runs vectorized simulation and PPO on CPU. Tune `--num_envs` and `--num_threads`; allocating more GPU memory will not accelerate MuJoCo physics steps.
 - Run a short benchmark after every scale change and confirm that iteration time improves before committing to 1500 iterations.
 
@@ -307,8 +338,16 @@ Large upstream projects belong in ignored `_deps/` checkouts, and runtime output
 - [x] Flat ground, stairs, domain randomization, sustained pushes, and off-screen video
 - [x] Bidirectional Gym / Lab → MuJoCo and MuJoCo → Gym sim2sim tools
 - [x] Policy distillation, hard-gated checkpoint selection, and a code change report
+- [x] Isaac Sim 6.0.1 GA migration, 8192-environment refinement, two-seed review, and final stair video
+- [x] ROS 2 Nav2 entry point, RTX LiDAR, calibrated-camera RGB/CameraInfo/depth writers
+- [x] Official 800k MID360 non-repetitive pattern, point timing, four-line layout, and full-density Sim 6 rollout
+- [x] Original serial wheel-leg, two-stage Sim 6 PPO, delayed-robust A/B, and TorchScript export
+- [x] G1 29-DOF SDK order, 480-D history, motor envelope, and runtime safety contract
 - [ ] Narrow the Isaac Lab → MuJoCo actuator and contact gap
+- [ ] Calibrate real camera and MID360 intensity/noise/dropout/motion distortion, then add Livox UDP packet-level simulation
+- [ ] Serial wheel-leg: MuJoCo sim2sim, a VMC comparison, and complex-terrain curricula
 - [ ] Add history-based policies, privileged teachers, and online adaptation
+- [ ] Complete native G1 29-DOF Isaac/MuJoCo training, bidirectional sim2sim, and ONNX/C++ replay
 - [ ] Publish checkpoint / benchmark releases without restricted assets
 - [ ] Explore hardware only after actuator calibration, latency, emergency-stop, and fall-protection validation
 

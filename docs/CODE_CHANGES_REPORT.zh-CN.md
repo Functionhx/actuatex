@@ -3,7 +3,7 @@
 > 项目：TinyMal 四足机器人鲁棒运动控制
 > 仓库：<https://github.com/Functionhx/actuatex>
 > 口号：**Learn. Act. Control.**
-> 报告日期：2026-07-18
+> 报告日期：2026-07-19
 
 ## 1. 报告目的
 
@@ -16,7 +16,7 @@
 | 模块 | 自主代码/补丁 | 主要作用 |
 |---|---:|---|
 | Isaac Gym | 12 个 TinyMal 环境/配置文件、14 个训练评估脚本、3 个上游补丁 | 基线行走、推力恢复、楼梯、随机化、混合地形、蒸馏训练 |
-| Isaac Lab | 12 个任务/算法文件、6 个训练评估脚本、1 个兼容补丁 | 新版 PhysX 5 原生训练、旧策略迁移、鲁棒与楼梯任务 |
+| Isaac Lab | 原生任务/算法包、训练评估与导航脚本、版本锁和历史兼容补丁 | PhysX 5 原生训练、旧策略迁移、鲁棒/楼梯任务、Sim 6 ROS 2 传感器 |
 | MuJoCo | 14 个训练、模型构建、评估文件 | 原生 PPO 训练、动力学修正、楼梯/推力测试、反向 sim2sim |
 | 公共工具 | sim2sim、checkpoint 比较、安装器 | 统一观测、策略加载、模型筛选、可复现安装 |
 
@@ -28,7 +28,7 @@ actuatex/
 │   ├── isaac_gym/        # TinyMal 覆盖层与上游补丁
 │   ├── isaac_lab/        # Isaac Lab 原生任务、脚本与兼容补丁
 │   └── mujoco/           # MuJoCo 原生训练与评估
-├── robots/tinymal/       # URDF 与网格模型
+├── robots/tinymal/       # URDF、网格与审计过的 capsule-compatible USD
 ├── tools/                # sim2sim 与 checkpoint 工具
 ├── scripts/              # 可重复执行的上游安装器
 └── docs/                 # 设计、实验与代码修改说明
@@ -184,6 +184,68 @@ damping = 0.5
 backends/isaac_lab/patches/0001-isaac-sim-5.1-offline-compat.patch
 ```
 
+该补丁现在只保留历史复现价值，不会应用到新环境。安装器会显式检查这一点，避免把旧 workaround 带进 Sim 6。
+
+### 5.5 迁移到 Isaac Sim 6.0.1 GA 与 Isaac Lab 3
+
+项目将新运行栈精确固定为 Isaac Sim `v6.0.1` GA 和官方配套的 Isaac Lab `v3.0.0-beta2.patch1`，没有直接跟随变化中的 `main`。迁移代码处理了以下不兼容变化：
+
+- Lab 对外四元数统一为 XYZW；
+- 机器人数据字段改为 ProxyArray/Warp 后，Torch 读取显式使用 `.torch`；
+- 根状态和关节写入改用新的 `_index` 参数；
+- `SimulationCfg.physx` 改为 `SimulationCfg.physics=PhysxCfg(...)`；
+- URDF `collider_type` 改为 `collision_type`；
+- RSL-RL 5 改为独立 actor、critic 与 Gaussian distribution 配置；
+- 新版必填的 `obs_groups` 显式映射 actor/critic 观测集合；
+- 旧版 checkpoint 热启动改为加载 `runner.alg.actor` 并核查缺失/意外 key；
+- 增加形状兼容的 69 维非对称 critic 热启动、学习率/熵/动作标准差参数覆盖；
+- 根据环境数自动扩展 PhysX found/lost-pair buffer，避免 4096/8192 环境下接触容量溢出；
+- 修复多 checkpoint 评估复用随机流的问题：每个候选都重建同一种子环境。
+
+版本锁位于 `backends/isaac_lab/upstream.json`。`scripts/install_isaac_lab_compat.py` 会验证 Lab commit、Sim 目录和 Python 3.12，且遇到已有 `_isaac_sim` 链接就停止，不覆盖旧运行时。
+
+官方 6.0.1 GA Linux ZIP 已按发布 MD5 完整校验，RTX 4070 Ti SUPER 在原驱动 `580.159.03` 下完成 headless 启动、4 环境一步训练和 8192 环境容量压测。8192 环境实测峰值显存 15092 MiB（92.2%），稳态吞吐约 15.3–15.7 万 steps/s，因此成为纯物理正式训练配置。
+
+### 5.6 保持 capsule 碰撞定义
+
+旧 Gym/Lab 实验把 URDF 中四个 hip cylinder 自动替换为 capsule；Sim 6 删除了这个 importer 开关。直接删除配置虽然能让程序启动，却会静默改变碰撞几何，破坏回归实验。
+
+项目因此加入 `robots/tinymal/usd/capsule_compat/`：它由旧 importer 按原设置生成，并经过组合审计，确认包含 4 个半径/高度均为 `0.03 m` 的 capsule、0 个 cylinder、CollisionAPI 完整且没有绝对引用。哈希和来源写入 `manifest.json`。Sim 6 训练默认使用这个 USD；只有显式设置 `ACTUATEX_TINYMAL_URDF` 才切到原生 cylinder，作为单独 A/B 组。
+
+### 5.7 新增 ROS 2 Nav2、RTX LiDAR 与标定相机入口
+
+`run_tinymal_nav2.py` 使用 Sim 6 的 `isaacsim.sensors.experimental.rtx`，迁移到新的 `Lidar/LidarSensor`、`RtxCamera/CameraSensor` 与 tick-rate 接口。脚本选择 Sim 随附的 Python 3.12 兼容 ROS 2 库，避免混装系统 Humble Python 3.10 扩展。
+
+相机不是只放一个理想 pinhole。新增 `camera_profile.py` 负责读取并严格校验真实 ROS `camera_info` YAML，支持常见 OpenCV 畸变模型、坐标轴转换和 CameraInfo 发布；未提供真实标定时不创建相机。对应纯 Python 测试已通过 18 项。RGB、CameraInfo、可选理想 depth writers 以及 RTX LiDAR → `LaserScan` writer 均已在实际仿真步进中附着并运行。该结果证明接口链路可用，不等价于外部 ROS 订阅回环或真实传感器误差已标定。
+
+MID360 已完成官方 800,000 点非重复扫描表的 Sim 6 RTX 实现。每个 10 Hz
+物理帧保留 20,000 个角度、逐点 `fireTimeNs` 与四条 Livox line；为绕过 RTX
+Hydra 单传感器 5 MiB 属性上限，代码使用 4 个 5,000 点同步 prim，并在
+writer 中按绝对逐点时间无损合并。`channelId` 与 Livox `line` 被明确分离，
+ROS 端按 `livox_ros_driver2` 的 26-byte `PointXYZRTLT` 布局打包。
+
+验证器实测 40/40 状态、20,000/20,000 发射点覆盖、4/4 分片与时间排序；
+完整密度、带外观的机器狗联调为 49 帧/5 秒、250 控制步零终止。实机强度、
+噪声、材质丢点、运动畸变参数和 UDP 包级驱动仍作为独立标定任务，不能把
+“官方扫描几何已复现”扩大表述为“真实传感器全链路已标定”。
+
+### 5.8 新增原创串联式轮腿任务并完成两阶段训练
+
+项目先调研了 Wheel-Legged-Gym、Flamingo 和 robot_lab，确认 6 动作开放串联轮腿、腿位置/轮速度混合控制以及当前 Isaac Lab 扩展组织均有公开先例，但没有复制第三方 CAD、mesh 或任务代码。新增 `robots/wheel_legged/`，用 URDF 基础几何体原创构建左右各 `hip → knee → wheel` 的 6-DOF 机器人，并单独记录资产来源。
+
+新增代码不是简单换一个 URDF：
+
+- `wheel_legged_cfg.py` 定义普通与 0–20 ms 随机延迟 actuator；
+- `wheel_legged_env_cfg.py` 定义 28 维观测、6 维混合动作、18 项奖励、终止和两级域随机化；
+- `wheel_legged_mdp.py` 实现轮速运动学先验、命令进度、腿对称和横向滑移等任务项；
+- `sim6_compat.py` 修复 Sim 6 URDF 嵌套刚体只给根 link 激活 contact report 的问题，使腿与轮接触数据真正进入奖励和终止；
+- `evaluate_wheel_legged.py` 为每个 checkpoint 重建同种子环境，支持 clean、训练随机化、未见 holdout 和 1280×720 跟随录像；
+- `export_wheel_legged_actor.py` 将最终 28→6 actor 导出为 TorchScript/state-dict，并做批量逐值一致性校验。
+
+第一阶段以 8192 环境训练 500 轮，第二阶段从 actor+critic 热启动并加入执行器延迟与更宽随机化，再训练 200 轮；合计 137,625,600 条 transition。1024 环境未见强扰动 A/B 中，第一阶段模型为 23 falls、RMSE 0.11662，最终模型为 7 falls、RMSE 0.09817，跌倒减少 69.6%。带延迟 clean 测试中两者均零跌倒，最终模型 RMSE 改善 37.1%。完整调研、配置和不利结果见 `docs/WHEEL_LEGGED_RL.zh-CN.md`。
+
+完整 runtime、训练、评估、录像与未完成真机边界见 `docs/ISAAC_SIM_6_MIGRATION.zh-CN.md`。
+
 ## 6. MuJoCo：从“只能导入 URDF”改成可训练的原生后端
 
 ### 6.1 发现并修复原始 URDF 动力学问题
@@ -248,19 +310,26 @@ MuJoCo 原生策略             ──→ Isaac Gym
 
 ## 8. 代表性实验验证
 
-以下数字来自本次最终实验记录；它们用于验证修改是否有效，而不是宣称已经完成真实机器人部署。
+下表同时保留迁移前基线和本轮 Sim 6.0.1 新结果。所有 Sim 6 checkpoint 比较都使用“每个候选重建同一种子环境”的修复后评估器；结果证明修改有效，但不宣称已经完成真实机器人部署。
 
 | 验证项目 | 结果 | 说明 |
 |---|---:|---|
 | Isaac Gym → MuJoCo 六段平地 | 平均 RMSE 0.08024，0/6 跌倒 | 跨引擎表现最稳定 |
-| Isaac Lab → MuJoCo 六段平地 | 平均 RMSE 0.33272，2/6 跌倒 | 暴露 PhysX 5 迁移差异，仍需继续优化 |
+| Isaac Lab 旧运行栈 → MuJoCo 六段平地 | 平均 RMSE 0.33272，2/6 跌倒 | 暴露 PhysX 5 迁移差异，仍需继续优化 |
 | MuJoCo 原生策略平地 | 平均 RMSE 0.07957，0/6 跌倒 | 原生训练已获得稳定步态 |
 | MuJoCo 动力学网格 | 16/16 零跌倒 | 对质量、摩擦等扰动进行组合验证 |
 | MuJoCo 持续推力 | 11/16 通过 | 较强或不利方向外力仍是后续重点 |
 | Isaac Lab 鲁棒随机测试 | 平均指标 0.0945，零 reset | 证明原生 Lab 训练链路可用 |
 | Isaac Lab 楼梯展示配置 | 64/64 通过 | 用于最终视频展示；严格随机条件通过率较低 |
+| Sim 6 通用鲁棒微调 | 两种子平均 RMSE 0.09445，较热启动降低 1.04% | 重置数不恶化；选中 `model50` |
+| Sim 6 台阶鲁棒微调 | 212/256 无重置登顶，236/256 首次登顶 | 两种子强随机验收；选中 `model10` |
+| Sim 6 串联式轮腿 holdout | 1024 环境：7 falls、RMSE 0.09817 | 相比第一阶段 23 falls，跌倒减少 69.6%；选中 `model199` |
+| Sim 6 → MuJoCo 30 秒 | 横移 17.12 秒、转向 8.02 秒跌倒 | 前进段虽存活但几乎不跟踪命令，不能写成迁移成功 |
+| Sim 6.0.1 runtime 迁移 | 启动、4×1 smoke、8192 环境、RTX/ROS writers、录像通过 | 仿真验收完成；实机传感器标定仍未完成 |
 
-结果说明：Isaac Lab 虽然是更新的框架，但更换求解器、驱动器和导入链路后仍需要重新辨识和训练，不能假设“软件更新所以策略必然更好”。本项目保留了失败数字和边界条件，并通过兼容补丁、显式执行器、观测对齐和原生重训逐步缩小差距。
+通用策略采用 8192 环境、60 iterations、11,796,480 samples 的低学习率微调；台阶策略采用 8192 环境、40 iterations、7,864,320 samples，并从五个 checkpoint 中按“无重置成功优先”选出第 10 轮。PPT 成片直接来自该最终模型的单环境 0 重置登顶 rollout。
+
+结果说明：Isaac Lab 虽然是更新的框架，但更换求解器、驱动器和导入链路后仍需要重新辨识和训练，不能假设“软件更新所以策略必然更好”。本项目保留了失败数字和边界条件，并通过兼容补丁、显式执行器、观测对齐和原生微调逐步缩小差距。
 
 ## 9. 大型上游仓库的工程化处理
 
@@ -297,6 +366,16 @@ sed -n '1,260p' backends/isaac_gym/patches/0003-reference-policy-distillation.pa
 sed -n '1,260p' backends/isaac_lab/patches/0001-isaac-sim-5.1-offline-compat.patch
 ```
 
+查看 Sim 6.0.1 的完整迁移与验收状态：
+
+```bash
+sed -n '1,360p' docs/ISAAC_SIM_6_MIGRATION.zh-CN.md
+python scripts/install_isaac_lab_compat.py \
+  --isaac-lab-root /path/to/IsaacLab-3 \
+  --isaac-sim-root /path/to/isaac-sim-6.0.1 \
+  --link-runtime --verify-python
+```
+
 应用 Isaac Gym 覆盖层：
 
 ```bash
@@ -322,6 +401,11 @@ python backends/mujoco/train_mujoco.py \
 - sim2sim 的核心是观测、动作、关节顺序、控制周期和坐标系一致，而不是只保证网络形状相同；
 - 多阶段学习容易遗忘旧能力，任务选择式策略蒸馏可保护已有步态；
 - 大型依赖应使用固定版本、覆盖层和补丁管理，才能清楚证明自主修改并保持仓库轻量；
+- 迁移准确性高于“先跑起来”：当新版删除自动 capsule 转换时，应保存并审计等价资产，而不是悄悄接受新碰撞体；
+- 相机和 LiDAR 的真实感需要标定、时序、噪声与驱动语义共同验证，只有外观相似不足以支撑 sim-to-real；
+- 大规模并行不只受显存约束，PhysX 接触 pair 容量也会随环境数快速增长，必须把容量告警纳入训练门槛；
+- 公平的 checkpoint 比较必须复位随机数流，否则候选顺序本身就会污染结论；
+- 参考开源项目不等于复制成品。先用公开项目验证路线，再用原创最小资产、固定控制契约和独立 holdout 建立自己的可审计基线；
 - 失败结果同样重要。Isaac Lab 的迁移差距明确指出了下一步应继续优化的方向：系统辨识、更强随机化、历史观测、teacher-student、对称正则和更严格的全任务统一验收。
 
 本报告仅展示最关键的代码修改。**更详细的源码、逐行补丁、安装方法、训练/评估脚本及持续更新见 GitHub：<https://github.com/Functionhx/actuatex>。**
