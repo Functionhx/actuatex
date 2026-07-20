@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Evaluate PPO/SAC/TD3 Sentinel checkpoints in Isaac Sim 6."""
+"""Evaluate RL, LQR and H-infinity Sentinel controllers in Isaac Sim 6."""
 
 from __future__ import annotations
 
@@ -26,6 +26,8 @@ parser.add_argument(
     default="clean",
 )
 parser.add_argument("--duration_scale", type=float, default=1.0)
+parser.add_argument("--command_ramp_s", type=float, default=0.0)
+parser.add_argument("--trace_dir", type=Path)
 parser.add_argument(
     "--output",
     type=Path,
@@ -33,7 +35,11 @@ parser.add_argument(
 )
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
-if args_cli.num_envs <= 0 or args_cli.duration_scale <= 0.0:
+if (
+    args_cli.num_envs <= 0
+    or args_cli.duration_scale <= 0.0
+    or args_cli.command_ramp_s < 0.0
+):
     parser.error("--num_envs and --duration_scale must be positive")
 args_cli.headless = True
 
@@ -46,6 +52,12 @@ import torch  # noqa: E402
 import isaaclab_tasks  # noqa: E402,F401
 import tinymal_lab  # noqa: E402,F401
 from tasks.robomaster.contract import POLICY_DT, contract_sha256  # noqa: E402
+from tasks.robomaster.evaluation import (  # noqa: E402
+    SENTINEL_COMMAND_SEGMENTS,
+    evaluation_settle_steps,
+    ramped_command,
+)
+from tasks.robomaster.evaluation_trace import SentinelTraceRecorder  # noqa: E402
 from tasks.robomaster.policy import load_policy  # noqa: E402
 from tinymal_lab.sentinel_env_cfg import (  # noqa: E402
     SentinelFlatEnvCfg,
@@ -55,16 +67,6 @@ from tinymal_lab.sentinel_env_cfg import (  # noqa: E402
 
 BACKEND = "Isaac Sim 6.0.1 GA / Isaac Lab 3.0.0-beta2.patch1 / PhysX 5"
 COMMAND_OBSERVATION_SLICE = slice(9, 12)
-SEGMENTS = (
-    ("stand", 2.0, (0.0, 0.0, 0.0)),
-    ("forward_0p5", 4.0, (0.5, 0.0, 0.0)),
-    ("forward_1p0", 4.0, (1.0, 0.0, 0.0)),
-    ("backward_0p5", 4.0, (-0.5, 0.0, 0.0)),
-    ("yaw_0p8", 4.0, (0.0, 0.0, 0.8)),
-    ("arc_0p7_0p6", 4.0, (0.7, 0.0, 0.6)),
-)
-
-
 def make_config() -> SentinelFlatEnvCfg:
     if args_cli.mode == "clean":
         config = SentinelFlatEnvCfg()
@@ -143,18 +145,23 @@ def evaluate_checkpoint(checkpoint: Path) -> dict:
         observation, _ = env.reset()
         reset_seen = torch.zeros(num_envs, dtype=torch.bool, device=device)
         result: dict[str, dict] = {}
+        previous_command = (0.0, 0.0, 0.0)
+        trace = SentinelTraceRecorder(num_envs)
+        elapsed_steps = 0
         robot = env.unwrapped.scene["robot"]
         actuator = robot.actuators["shared_dc_bank"]
 
         with torch.inference_mode():
-            for segment_name, nominal_duration, command in SEGMENTS:
-                duration = nominal_duration * args_cli.duration_scale
+            for segment in SENTINEL_COMMAND_SEGMENTS:
+                duration = segment.duration_s * args_cli.duration_scale
                 num_steps = max(1, round(duration / POLICY_DT))
-                settle_steps = min(
-                    num_steps - 1,
-                    round(min(1.0, duration / 3.0) / POLICY_DT),
+                ramp_duration = min(args_cli.command_ramp_s, duration)
+                settle_steps = evaluation_settle_steps(
+                    num_steps=num_steps,
+                    duration_s=duration,
+                    dt=POLICY_DT,
+                    ramp_duration_s=ramp_duration,
                 )
-                set_command(env, observation, command)
                 squared_error = torch.zeros(3, device=device)
                 upright_error_sum = torch.zeros((), device=device)
                 sample_count = 0
@@ -167,6 +174,14 @@ def evaluate_checkpoint(checkpoint: Path) -> dict:
                 disabled_samples = 0
 
                 for step in range(num_steps):
+                    current_command = ramped_command(
+                        previous_command,
+                        segment.command,
+                        step=step,
+                        dt=POLICY_DT,
+                        ramp_duration_s=ramp_duration,
+                    )
+                    set_command(env, observation, current_command)
                     action = loaded.actor(observation["policy"])
                     if not bool(torch.isfinite(action).all()):
                         raise RuntimeError("policy produced a non-finite action")
@@ -175,7 +190,6 @@ def evaluate_checkpoint(checkpoint: Path) -> dict:
                         raise RuntimeError(
                             "unexpected timeout during Sentinel evaluation"
                         )
-                    set_command(env, observation, command)
                     falls += int(terminated.sum().item())
                     reset_seen |= terminated
                     data = robot.data
@@ -202,6 +216,37 @@ def evaluate_checkpoint(checkpoint: Path) -> dict:
                     disabled_samples += int(
                         (~actuator.referee.chassis_enabled).sum().item()
                     )
+                    trace.record(
+                        time_s=elapsed_steps * POLICY_DT,
+                        segment=segment.name,
+                        command=current_command,
+                        base_linear_velocity_body=(
+                            data.root_lin_vel_b.torch.detach().cpu().numpy()
+                        ),
+                        base_angular_velocity_body=(
+                            data.root_ang_vel_b.torch.detach().cpu().numpy()
+                        ),
+                        projected_gravity=(
+                            data.projected_gravity_b.torch.detach().cpu().numpy()
+                        ),
+                        base_height_m=(
+                            data.root_pos_w.torch[:, 2].detach().cpu().numpy()
+                        ),
+                        action=action.detach().cpu().numpy(),
+                        chassis_power_w=(
+                            actuator.accounted_chassis_power_w.detach()
+                            .cpu()
+                            .numpy()
+                        ),
+                        motor_temperature_c=(
+                            actuator.motor_temperature_c.detach().cpu().numpy()
+                        ),
+                        buffer_energy_j=(
+                            actuator.referee.buffer_energy_j.detach().cpu().numpy()
+                        ),
+                        terminal=terminated.detach().cpu().numpy(),
+                    )
+                    elapsed_steps += 1
                     if step >= settle_steps:
                         actual = torch.stack(
                             (
@@ -211,7 +256,9 @@ def evaluate_checkpoint(checkpoint: Path) -> dict:
                             ),
                             dim=1,
                         )
-                        target = torch.tensor(command, device=device).unsqueeze(0)
+                        target = torch.tensor(
+                            segment.command, device=device
+                        ).unsqueeze(0)
                         squared_error += torch.square(actual - target).sum(dim=0)
                         upright_error_sum += torch.acos(
                             torch.clamp(
@@ -223,9 +270,10 @@ def evaluate_checkpoint(checkpoint: Path) -> dict:
                         sample_count += num_envs
 
                 rmse = torch.sqrt(squared_error / max(1, sample_count))
-                result[segment_name] = {
-                    "command": list(command),
+                result[segment.name] = {
+                    "command": list(segment.command),
                     "duration_s": duration,
+                    "command_ramp_s": ramp_duration,
                     "vx_rmse": float(rmse[0].item()),
                     "vy_rmse": float(rmse[1].item()),
                     "yaw_rmse": float(rmse[2].item()),
@@ -240,6 +288,25 @@ def evaluate_checkpoint(checkpoint: Path) -> dict:
                     "disabled_chassis_samples": disabled_samples,
                     "falls": falls,
                 }
+                previous_command = segment.command
+
+        trace_csv = None
+        trace_plot = None
+        if args_cli.trace_dir is not None:
+            trace_stem = (
+                f"{checkpoint.stem}_seed{args_cli.seed}_"
+                f"{args_cli.mode}_ramp{args_cli.command_ramp_s:g}"
+            )
+            trace_csv = args_cli.trace_dir / f"{trace_stem}.csv"
+            trace_plot = args_cli.trace_dir / f"{trace_stem}.svg"
+            trace.write_csv(trace_csv)
+            trace.write_svg(
+                trace_plot,
+                title=(
+                    f"Isaac Sim 6 · {loaded.algorithm.upper()} · "
+                    f"{args_cli.mode} · seed {args_cli.seed}"
+                ),
+            )
 
         primary_errors = []
         for segment in result.values():
@@ -270,6 +337,11 @@ def evaluate_checkpoint(checkpoint: Path) -> dict:
             "seed": args_cli.seed,
             "randomized_command_delay_ms": (
                 [0, 0] if args_cli.mode == "clean" else [0, 20]
+            ),
+            "command_ramp_s": args_cli.command_ramp_s,
+            "trace_csv": None if trace_csv is None else str(trace_csv.resolve()),
+            "trace_plot": (
+                None if trace_plot is None else str(trace_plot.resolve())
             ),
             "segments": result,
             "falls_total": sum(item["falls"] for item in result.values()),

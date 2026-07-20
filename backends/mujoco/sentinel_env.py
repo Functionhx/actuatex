@@ -36,6 +36,7 @@ from tasks.robomaster.contract import (  # noqa: E402
     SIM_DT,
 )
 from tasks.robomaster.locomotion import (  # noqa: E402
+    COMMAND_OBSERVATION_SLICE,
     OBSERVATION_DIM,
     OBSERVATION_NOISE_AMPLITUDE,
     TRACK_WIDTH_M,
@@ -643,6 +644,9 @@ class MjSentinelEnv(VecEnvBase):
         self.fixed_command = np.asarray(command, dtype=np.float64).copy()
         self.commands[:] = self.fixed_command
         self.command_steps_remaining[:] = self.max_episode_length + 1
+        self.obs_buf[:, COMMAND_OBSERVATION_SLICE] = torch.from_numpy(
+            self.commands.astype(np.float32)
+        ).to(self.device)
 
     def clear_command_override(self) -> None:
         self.fixed_command = None

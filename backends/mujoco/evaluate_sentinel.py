@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate PPO/SAC/TD3 Sentinel checkpoints natively or via sim2sim."""
+"""Evaluate RL, LQR and H-infinity Sentinel controllers in MuJoCo."""
 
 from __future__ import annotations
 
@@ -22,17 +22,13 @@ from tasks.robomaster.contract import (  # noqa: E402
     SIM_DT,
     contract_sha256,
 )
-from tasks.robomaster.policy import load_policy  # noqa: E402
-
-
-SEGMENTS = (
-    ("stand", 2.0, (0.0, 0.0, 0.0)),
-    ("forward_0p5", 4.0, (0.5, 0.0, 0.0)),
-    ("forward_1p0", 4.0, (1.0, 0.0, 0.0)),
-    ("backward_0p5", 4.0, (-0.5, 0.0, 0.0)),
-    ("yaw_0p8", 4.0, (0.0, 0.0, 0.8)),
-    ("arc_0p7_0p6", 4.0, (0.7, 0.0, 0.6)),
+from tasks.robomaster.evaluation import (  # noqa: E402
+    SENTINEL_COMMAND_SEGMENTS,
+    evaluation_settle_steps,
+    ramped_command,
 )
+from tasks.robomaster.evaluation_trace import SentinelTraceRecorder  # noqa: E402
+from tasks.robomaster.policy import load_policy  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,6 +39,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=71)
     parser.add_argument("--maximum-command-delay-steps", type=int, default=0)
     parser.add_argument("--duration-scale", type=float, default=1.0)
+    parser.add_argument("--command-ramp-s", type=float, default=0.0)
+    parser.add_argument("--trace-dir", type=Path)
     parser.add_argument(
         "--device",
         default="cuda:0" if torch.cuda.is_available() else "cpu",
@@ -70,16 +68,21 @@ def evaluate_checkpoint(args: argparse.Namespace, checkpoint: Path) -> dict:
     observation, _ = env.reset()
     reset_seen = np.zeros(args.num_envs, dtype=bool)
     result: dict[str, dict] = {}
+    previous_command = (0.0, 0.0, 0.0)
+    trace = SentinelTraceRecorder(args.num_envs)
+    elapsed_steps = 0
     try:
         with torch.inference_mode():
-            for segment_name, nominal_duration, command in SEGMENTS:
-                duration = nominal_duration * args.duration_scale
+            for segment in SENTINEL_COMMAND_SEGMENTS:
+                duration = segment.duration_s * args.duration_scale
                 num_steps = max(1, round(duration / POLICY_DT))
-                settle_steps = min(
-                    num_steps - 1,
-                    round(min(1.0, duration / 3.0) / POLICY_DT),
+                ramp_duration = min(args.command_ramp_s, duration)
+                settle_steps = evaluation_settle_steps(
+                    num_steps=num_steps,
+                    duration_s=duration,
+                    dt=POLICY_DT,
+                    ramp_duration_s=ramp_duration,
                 )
-                env.set_command(np.asarray(command))
                 squared_error = np.zeros(3, dtype=np.float64)
                 upright_error_sum = 0.0
                 sample_count = 0
@@ -91,6 +94,14 @@ def evaluate_checkpoint(args: argparse.Namespace, checkpoint: Path) -> dict:
                 maximum_chassis_power = 0.0
                 disabled_samples = 0
                 for step in range(num_steps):
+                    current_command = ramped_command(
+                        previous_command,
+                        segment.command,
+                        step=step,
+                        dt=POLICY_DT,
+                        ramp_duration_s=ramp_duration,
+                    )
+                    env.set_command(np.asarray(current_command))
                     action = actor(observation.to(args.device))
                     if not bool(torch.isfinite(action).all()):
                         raise RuntimeError("policy produced a non-finite action")
@@ -99,6 +110,25 @@ def evaluate_checkpoint(args: argparse.Namespace, checkpoint: Path) -> dict:
                     falls += int(np.count_nonzero(terminal))
                     reset_seen |= terminal
                     diagnostics = env.diagnostics()
+                    trace.record(
+                        time_s=elapsed_steps * POLICY_DT,
+                        segment=segment.name,
+                        command=current_command,
+                        base_linear_velocity_body=diagnostics[
+                            "base_linear_velocity_body"
+                        ],
+                        base_angular_velocity_body=diagnostics[
+                            "base_angular_velocity_body"
+                        ],
+                        projected_gravity=diagnostics["projected_gravity"],
+                        base_height_m=diagnostics["base_position"][:, 2],
+                        action=action.cpu().numpy(),
+                        chassis_power_w=diagnostics["chassis_power_w"],
+                        motor_temperature_c=diagnostics["motor_temperature_c"],
+                        buffer_energy_j=diagnostics["buffer_energy_j"],
+                        terminal=terminal,
+                    )
+                    elapsed_steps += 1
                     minimum_height = min(
                         minimum_height,
                         float(diagnostics["base_position"][:, 2].min()),
@@ -136,7 +166,7 @@ def evaluate_checkpoint(args: argparse.Namespace, checkpoint: Path) -> dict:
                             axis=1,
                         )
                         squared_error += np.square(
-                            actual - np.asarray(command)
+                            actual - np.asarray(segment.command)
                         ).sum(axis=0)
                         upright_error_sum += float(
                             np.arccos(
@@ -149,9 +179,10 @@ def evaluate_checkpoint(args: argparse.Namespace, checkpoint: Path) -> dict:
                         )
                         sample_count += args.num_envs
                 rmse = np.sqrt(squared_error / max(1, sample_count))
-                result[segment_name] = {
-                    "command": list(command),
+                result[segment.name] = {
+                    "command": list(segment.command),
                     "duration_s": duration,
+                    "command_ramp_s": ramp_duration,
                     "vx_rmse": float(rmse[0]),
                     "vy_rmse": float(rmse[1]),
                     "yaw_rmse": float(rmse[2]),
@@ -165,8 +196,23 @@ def evaluate_checkpoint(args: argparse.Namespace, checkpoint: Path) -> dict:
                     "disabled_chassis_samples": disabled_samples,
                     "falls": falls,
                 }
+                previous_command = segment.command
     finally:
         env.close()
+
+    trace_csv = None
+    trace_plot = None
+    if args.trace_dir is not None:
+        trace_stem = (
+            f"{checkpoint.stem}_seed{args.seed}_ramp{args.command_ramp_s:g}"
+        )
+        trace_csv = args.trace_dir / f"{trace_stem}.csv"
+        trace_plot = args.trace_dir / f"{trace_stem}.svg"
+        trace.write_csv(trace_csv)
+        trace.write_svg(
+            trace_plot,
+            title=f"MuJoCo · {loaded.algorithm.upper()} · seed {args.seed}",
+        )
 
     primary_errors = []
     for segment in result.values():
@@ -198,6 +244,9 @@ def evaluate_checkpoint(args: argparse.Namespace, checkpoint: Path) -> dict:
             0,
             args.maximum_command_delay_steps * 1000 * SIM_DT,
         ],
+        "command_ramp_s": args.command_ramp_s,
+        "trace_csv": None if trace_csv is None else str(trace_csv.resolve()),
+        "trace_plot": None if trace_plot is None else str(trace_plot.resolve()),
         "segments": result,
         "falls_total": sum(segment["falls"] for segment in result.values()),
         "envs_with_falls": int(np.count_nonzero(reset_seen)),
@@ -210,7 +259,11 @@ def main() -> None:
     args = parse_args()
     if min(args.num_envs, args.num_threads) <= 0:
         raise ValueError("num-envs and num-threads must be positive")
-    if args.maximum_command_delay_steps < 0 or args.duration_scale <= 0.0:
+    if (
+        args.maximum_command_delay_steps < 0
+        or args.duration_scale <= 0.0
+        or args.command_ramp_s < 0.0
+    ):
         raise ValueError("delay must be non-negative and duration scale positive")
     evaluations = [
         evaluate_checkpoint(args, checkpoint) for checkpoint in args.checkpoint

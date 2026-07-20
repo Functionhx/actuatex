@@ -1,4 +1,4 @@
-"""Load PPO, SAC and TD3 Sentinel actors behind one inference contract."""
+"""Load RL and linear Sentinel actors behind one inference contract."""
 
 from __future__ import annotations
 
@@ -15,6 +15,12 @@ from tasks.inverted_pendulum.off_policy_rl import (
 )
 
 from .contract import ACTION_DIM
+from .linear_control import (
+    LINEAR_CONTROLLER_CHECKPOINT_FORMAT,
+    SCHEDULED_LINEAR_CONTROLLER_CHECKPOINT_FORMAT,
+    LinearFeedbackActor,
+    ScheduledLinearFeedbackActor,
+)
 from .locomotion import OBSERVATION_DIM
 
 
@@ -87,6 +93,69 @@ def load_policy(
             actor=actor,
             algorithm=str(payload["off_policy_algorithm"]),
             checkpoint_format="actuatex_off_policy_v1",
+            observation_dim=observation_dim,
+            action_dim=action_dim,
+            metadata=dict(payload.get("metadata", {})),
+        )
+
+    if payload.get("checkpoint_format") == LINEAR_CONTROLLER_CHECKPOINT_FORMAT:
+        observation_dim = int(payload["observation_dim"])
+        action_dim = int(payload["action_dim"])
+        if (observation_dim, action_dim) != (OBSERVATION_DIM, ACTION_DIM):
+            raise ValueError(
+                "linear controller dimensions do not match Sentinel: "
+                f"{observation_dim}x{action_dim}"
+            )
+        controller = str(payload["linear_controller"])
+        if controller not in {"lqr", "hinf"}:
+            raise ValueError(f"unsupported linear controller {controller!r}")
+        actor = LinearFeedbackActor(
+            payload["gain"],
+            state_center=payload.get("state_center"),
+            action_offset=payload.get("action_offset"),
+            forward_feedforward_scale=float(
+                payload.get("forward_feedforward_scale", 1.0)
+            ),
+            yaw_feedforward_scale=float(
+                payload.get("yaw_feedforward_scale", 1.0)
+            ),
+        ).to(device).eval()
+        return LoadedPolicy(
+            actor=actor,
+            algorithm=controller,
+            checkpoint_format=LINEAR_CONTROLLER_CHECKPOINT_FORMAT,
+            observation_dim=observation_dim,
+            action_dim=action_dim,
+            metadata=dict(payload.get("metadata", {})),
+        )
+
+    if (
+        payload.get("checkpoint_format")
+        == SCHEDULED_LINEAR_CONTROLLER_CHECKPOINT_FORMAT
+    ):
+        observation_dim = int(payload["observation_dim"])
+        action_dim = int(payload["action_dim"])
+        if (observation_dim, action_dim) != (OBSERVATION_DIM, ACTION_DIM):
+            raise ValueError(
+                "scheduled controller dimensions do not match Sentinel: "
+                f"{observation_dim}x{action_dim}"
+            )
+        controller = str(payload["linear_controller"])
+        if controller not in {"lqr", "hinf"}:
+            raise ValueError(f"unsupported scheduled controller {controller!r}")
+        actor = ScheduledLinearFeedbackActor(
+            payload["gains"],
+            state_centers=payload["state_centers"],
+            action_offsets=payload["action_offsets"],
+            operating_commands=payload["operating_commands"],
+            feedforward_scales=payload["feedforward_scales"],
+            command_distance_scales=payload["command_distance_scales"],
+            schedule_sharpness=float(payload["schedule_sharpness"]),
+        ).to(device).eval()
+        return LoadedPolicy(
+            actor=actor,
+            algorithm=controller,
+            checkpoint_format=SCHEDULED_LINEAR_CONTROLLER_CHECKPOINT_FORMAT,
             observation_dim=observation_dim,
             action_dim=action_dim,
             metadata=dict(payload.get("metadata", {})),
