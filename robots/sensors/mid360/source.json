@@ -1,0 +1,41 @@
+{
+  "sensor": "Livox Mid-360",
+  "official_specs": {
+    "url": "https://www.livoxtech.com/mid-360/specs",
+    "points_per_second": 200000,
+    "typical_frame_rate_hz": 10,
+    "horizontal_fov_deg": 360,
+    "vertical_fov_deg": [-7, 52],
+    "blind_zone_m": 0.1,
+    "range_m_at_10_percent_reflectivity": 40,
+    "range_m_at_80_percent_reflectivity": 70,
+    "range_accuracy_m_at_10m": 0.02,
+    "angular_accuracy_deg": 0.15,
+    "wavelength_nm": 905,
+    "envelope_mm": [65, 65, 60],
+    "mass_g": 265
+  },
+  "official_manual": {
+    "url": "https://terra-1-g.djicdn.com/851d20f7b9f64838a34cd02351370894/Livox/Livox_Mid-360_User_Manual_CHS.pdf",
+    "optical_origin_above_bottom_mm": 47
+  },
+  "official_cad": {
+    "url": "https://terra-1-g.djicdn.com/65c028cd298f4669a7f0e40e50ba1131/Mid360/mid-360-asm.stp",
+    "sha256": "b93e9b51282ed319b6aa755e76a132c0eb03306da5f3b9676bcabf2e2ae25f02",
+    "redistributed": false
+  },
+  "official_scan_pattern": {
+    "repository": "https://github.com/Livox-SDK/livox_laser_simulation",
+    "commit": "1cce1073633a062b92e30243a4c2920e45551bb5",
+    "path": "scan_mode/mid360.csv",
+    "sha256": "aa1fc08b6a4400608dbd6ee832b7ea3a9c3c37197e734f60f58fe5abf762269a",
+    "license": "MIT",
+    "points": 800000,
+    "cycle_seconds": 4
+  },
+  "procedural_visual": {
+    "path": "usd/mid360_visual.usda",
+    "status": "open visual approximation, not official CAD",
+    "license": "MIT"
+  }
+}

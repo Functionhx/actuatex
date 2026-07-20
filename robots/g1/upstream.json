@@ -1,0 +1,32 @@
+{
+  "robot": "Unitree G1 29-DOF",
+  "assets_vendored": false,
+  "canonical_joint_order": "Unitree LowCmd/LowState SDK order",
+  "unitree_mujoco": {
+    "url": "https://github.com/unitreerobotics/unitree_mujoco.git",
+    "commit": "ae6a8403e272733e9996ef59990880330496177f",
+    "license": "BSD-3-Clause",
+    "audit": "G1 29-DOF joint order, limits, motor ctrlrange and IMU sensors inspected"
+  },
+  "unitree_rl_lab": {
+    "url": "https://github.com/unitreerobotics/unitree_rl_lab.git",
+    "commit": "4960b84732b0c2ec593dccbfe963fda1bcd7b1e3",
+    "license": "Apache-2.0",
+    "audit": "29-DOF deployment map, 50 Hz timing, five-sample history, PD gains and actuator curves inspected"
+  },
+  "unitree_rl_mjlab": {
+    "url": "https://github.com/unitreerobotics/unitree_rl_mjlab.git",
+    "commit": "1425b15f73bd4095f0df53709d7c389c3eb9e790",
+    "license": "Apache-2.0",
+    "audit": "revision pinned; native MjLab task integration remains in progress"
+  },
+  "contract": {
+    "implementation": "tasks/locomotion/g1_29dof.py",
+    "action_dim": 29,
+    "single_frame_observation_dim": 96,
+    "history_length": 5,
+    "policy_observation_dim": 480,
+    "policy_frequency_hz": 50
+  },
+  "validation_status": "backend-neutral contract and unit tests complete; paired 29-DOF backend training is not yet complete"
+}

@@ -20,7 +20,9 @@ parser.add_argument(
 )
 parser.add_argument("--num_envs", type=int, default=256)
 parser.add_argument("--seed", type=int, default=17)
-parser.add_argument("--out", default="evaluation/isaac_lab_native/robustness_result.json")
+parser.add_argument(
+    "--out", default="evaluation/isaac_lab_native/robustness_result.json"
+)
 AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
 args_cli.headless = True
@@ -46,6 +48,7 @@ SEGMENTS = (
     ("lateral_0p2", 3.0, (0.0, 0.2, 0.0)),
     ("yaw_0p5", 3.0, (0.0, 0.0, 0.5)),
 )
+BACKEND = "Isaac Sim 6.0.1 GA / Isaac Lab 3.0.0-beta2.patch1 / PhysX 5"
 
 
 def build_actor():
@@ -88,7 +91,7 @@ def set_command(env, obs, command):
     )
 
 
-def main():
+def make_cfg():
     cfg = TinymalRobustEnvCfg()
     cfg.seed = args_cli.seed
     cfg.scene.num_envs = args_cli.num_envs
@@ -97,96 +100,103 @@ def main():
     cfg.episode_length_s = 30.0
     cfg.commands.base_velocity.resampling_time_range = (1.0e9, 1.0e9)
     cfg.commands.base_velocity.rel_standing_envs = 0.0
+    return cfg
 
-    env = gym.make("Isaac-Velocity-Native-Robust-TinyMal-v0", cfg=cfg)
-    device = env.unwrapped.device
+
+def main():
     stressors = {
-            "friction": [0.45, 1.35],
-            "base_mass_scale": [0.85, 1.15],
-            "base_com_m": {"xy": [-0.012, 0.012], "z": [-0.008, 0.008]},
-            "pd_stiffness_scale": [0.85, 1.15],
-            "pd_damping_scale": [0.70, 1.30],
-            "actuator_delay_ms": [20, 60],
-            "push_velocity_xy_mps": [-0.60, 0.60],
-            "push_yaw_rate_radps": [-0.50, 0.50],
-            "push_interval_s": [4.0, 7.0],
-            "observation_noise": True,
+        "friction": [0.45, 1.35],
+        "base_mass_scale": [0.85, 1.15],
+        "base_com_m": {"xy": [-0.012, 0.012], "z": [-0.008, 0.008]},
+        "pd_stiffness_scale": [0.85, 1.15],
+        "pd_damping_scale": [0.70, 1.30],
+        "actuator_delay_ms": [20, 60],
+        "push_velocity_xy_mps": [-0.60, 0.60],
+        "push_yaw_rate_radps": [-0.50, 0.50],
+        "push_interval_s": [4.0, 7.0],
+        "observation_noise": True,
     }
     evaluations = []
     for checkpoint in args_cli.ckpt:
         checkpoint = os.path.abspath(checkpoint)
-        actor = load_actor(checkpoint, device)
-        obs, _ = env.reset()
-        result = {}
+        # Recreate the environment for every actor.  A plain env.reset() does
+        # not rewind observation-noise, push, and reset RNG streams, so sharing
+        # one rollout environment biases later checkpoints in a sweep.
+        env = gym.make("Isaac-Velocity-Native-Robust-TinyMal-v0", cfg=make_cfg())
+        try:
+            device = env.unwrapped.device
+            actor = load_actor(checkpoint, device)
+            obs, _ = env.reset()
+            result = {}
 
-        # Keep gradients disabled while allowing Isaac Lab's automatic resets
-        # to update state buffers in place between checkpoint rollouts.
-        with torch.no_grad():
-            for name, duration, command in SEGMENTS:
-                set_command(env, obs, command)
-                num_steps = int(round(duration / 0.02))
-                settle_steps = int(round(min(1.0, duration / 3.0) / 0.02))
-                square_error = torch.zeros(3, device=device)
-                sample_count = 0
-                reset_count = 0
-                min_height = float("inf")
-                for step in range(num_steps):
-                    actions = actor(obs["policy"])
-                    obs, _, terminated, _, _ = env.step(actions)
+            with torch.no_grad():
+                for name, duration, command in SEGMENTS:
                     set_command(env, obs, command)
-                    reset_count += int(terminated.sum().item())
-                    robot = env.unwrapped.scene["robot"].data
-                    min_height = min(
-                        min_height, float(robot.root_pos_w[:, 2].min().item())
-                    )
-                    if step >= settle_steps:
-                        actual = torch.stack(
-                            (
-                                robot.root_lin_vel_b[:, 0],
-                                robot.root_lin_vel_b[:, 1],
-                                robot.root_ang_vel_b[:, 2],
-                            ),
-                            dim=1,
+                    num_steps = int(round(duration / 0.02))
+                    settle_steps = int(round(min(1.0, duration / 3.0) / 0.02))
+                    square_error = torch.zeros(3, device=device)
+                    sample_count = 0
+                    reset_count = 0
+                    min_height = float("inf")
+                    for step in range(num_steps):
+                        actions = actor(obs["policy"])
+                        obs, _, terminated, _, _ = env.step(actions)
+                        set_command(env, obs, command)
+                        reset_count += int(terminated.sum().item())
+                        robot = env.unwrapped.scene["robot"].data
+                        min_height = min(
+                            min_height,
+                            float(robot.root_pos_w.torch[:, 2].min().item()),
                         )
-                        target = torch.tensor(command, device=device).unsqueeze(0)
-                        square_error += torch.square(actual - target).sum(dim=0)
-                        sample_count += actual.shape[0]
-                rmse = torch.sqrt(square_error / max(1, sample_count))
-                result[name] = {
-                    "command": list(command),
-                    "vx_rmse": float(rmse[0].item()),
-                    "vy_rmse": float(rmse[1].item()),
-                    "yaw_rmse": float(rmse[2].item()),
-                    "resets_total": reset_count,
-                    "step_survival_fraction": 1.0
-                    - reset_count / float(max(1, num_steps * args_cli.num_envs)),
-                    "minimum_base_height_m": min_height,
-                }
+                        if step >= settle_steps:
+                            actual = torch.stack(
+                                (
+                                    robot.root_lin_vel_b.torch[:, 0],
+                                    robot.root_lin_vel_b.torch[:, 1],
+                                    robot.root_ang_vel_b.torch[:, 2],
+                                ),
+                                dim=1,
+                            )
+                            target = torch.tensor(command, device=device).unsqueeze(0)
+                            square_error += torch.square(actual - target).sum(dim=0)
+                            sample_count += actual.shape[0]
+                    rmse = torch.sqrt(square_error / max(1, sample_count))
+                    result[name] = {
+                        "command": list(command),
+                        "vx_rmse": float(rmse[0].item()),
+                        "vy_rmse": float(rmse[1].item()),
+                        "yaw_rmse": float(rmse[2].item()),
+                        "resets_total": reset_count,
+                        "step_survival_fraction": 1.0
+                        - reset_count / float(max(1, num_steps * args_cli.num_envs)),
+                        "minimum_base_height_m": min_height,
+                    }
 
-        main_errors = []
-        for segment in result.values():
-            command = segment["command"]
-            if command[0] != 0.0 or (command[1] == 0.0 and command[2] == 0.0):
-                main_errors.append(segment["vx_rmse"])
-            elif command[1] != 0.0:
-                main_errors.append(segment["vy_rmse"])
-            else:
-                main_errors.append(segment["yaw_rmse"])
-        evaluations.append(
-            {
-                "backend": "Isaac Sim / Isaac Lab / PhysX 5",
-                "checkpoint": checkpoint,
-                "seed": args_cli.seed,
-                "num_envs": args_cli.num_envs,
-                "stressors": stressors,
-                "segments": result,
-                "resets_total": sum(
-                    segment["resets_total"] for segment in result.values()
-                ),
-                "mean_main_axis_rmse": sum(main_errors) / len(main_errors),
-            }
-        )
-        del actor
+            main_errors = []
+            for segment in result.values():
+                command = segment["command"]
+                if command[0] != 0.0 or (command[1] == 0.0 and command[2] == 0.0):
+                    main_errors.append(segment["vx_rmse"])
+                elif command[1] != 0.0:
+                    main_errors.append(segment["vy_rmse"])
+                else:
+                    main_errors.append(segment["yaw_rmse"])
+            evaluations.append(
+                {
+                    "backend": BACKEND,
+                    "checkpoint": checkpoint,
+                    "seed": args_cli.seed,
+                    "num_envs": args_cli.num_envs,
+                    "stressors": stressors,
+                    "segments": result,
+                    "resets_total": sum(
+                        segment["resets_total"] for segment in result.values()
+                    ),
+                    "mean_main_axis_rmse": sum(main_errors) / len(main_errors),
+                }
+            )
+        finally:
+            env.close()
 
     if len(evaluations) == 1:
         payload = evaluations[0]
@@ -196,7 +206,7 @@ def main():
             key=lambda item: (item["resets_total"], item["mean_main_axis_rmse"]),
         )
         payload = {
-            "backend": "Isaac Sim / Isaac Lab / PhysX 5",
+            "backend": BACKEND,
             "best_checkpoint": ranking[0]["checkpoint"],
             "ranking": [item["checkpoint"] for item in ranking],
             "results": evaluations,
@@ -207,7 +217,6 @@ def main():
         json.dump(payload, stream, indent=2, sort_keys=True)
         stream.write("\n")
     print(json.dumps(payload, indent=2, sort_keys=True))
-    env.close()
 
 
 if __name__ == "__main__":

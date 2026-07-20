@@ -10,6 +10,9 @@ ActuateX uses, but does not vendor, the following major dependencies:
 | Unitree RL Gym | <https://github.com/unitreerobotics/unitree_rl_gym> | BSD-3-Clause; pinned in `backends/isaac_gym/upstream.json` |
 | RSL-RL | <https://github.com/leggedrobotics/rsl_rl> | BSD-3-Clause; v1.0.2 pinned in `backends/isaac_gym/upstream.json` |
 | MuJoCo | <https://github.com/google-deepmind/mujoco> | Apache-2.0; installed as a Python dependency |
+| Unitree MuJoCo | <https://github.com/unitreerobotics/unitree_mujoco> | BSD-3-Clause; G1 model is an external pinned dependency in `robots/g1/upstream.json` |
+| Unitree RL Lab | <https://github.com/unitreerobotics/unitree_rl_lab> | Apache-2.0; G1 Isaac/deployment reference is pinned in `robots/g1/upstream.json` |
+| Unitree RL MjLab | <https://github.com/unitreerobotics/unitree_rl_mjlab> | Apache-2.0; G1 MuJoCo training reference is pinned in `robots/g1/upstream.json` |
 
 Copies of the BSD license texts required by the included compatibility patches are in `third_party/licenses/`.
 

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" shape-rendering="crispEdges">
+  <title>TinyMal 10 m by 10 m navigation arena occupancy map</title>
+  <rect width="200" height="200" fill="#ffffff"/>
+  <g fill="#000000">
+    <rect x="0" y="0" width="200" height="4"/>
+    <rect x="0" y="196" width="200" height="4"/>
+    <rect x="0" y="0" width="4" height="200"/>
+    <rect x="196" y="0" width="4" height="200"/>
+    <rect x="80" y="80" width="8" height="80"/>
+    <rect x="120" y="80" width="50" height="10"/>
+    <rect x="130" y="126" width="14" height="14"/>
+  </g>
+</svg>

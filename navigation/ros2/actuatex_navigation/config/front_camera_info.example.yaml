@@ -1,0 +1,22 @@
+# EXAMPLE ONLY. Replace this file with calibration from the physical camera.
+# Do not use these values as evidence of sim-to-real camera fidelity.
+image_width: 640
+image_height: 480
+camera_name: front_camera_example_not_calibrated
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [600.0, 0.0, 320.0, 0.0, 600.0, 240.0, 0.0, 0.0, 1.0]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.0, 0.0, 0.0, 0.0, 0.0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [600.0, 0.0, 320.0, 0.0, 0.0, 600.0, 240.0, 0.0, 0.0, 0.0, 1.0, 0.0]

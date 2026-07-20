@@ -1,4 +1,5 @@
 *.STL binary
+*.usd binary
 *.png binary
 *.pdf binary
 *.patch text eol=lf

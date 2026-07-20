@@ -50,6 +50,8 @@ import tinymal_lab  # noqa: E402,F401
 from tinymal_lab.tinymal_stair_env_cfg import TinymalStairEnvCfg  # noqa: E402
 from tinymal_lab.tinymal_robust_env_cfg import TinymalRobustEnvCfg  # noqa: E402
 
+BACKEND = "Isaac Sim 6.0.1 GA / Isaac Lab 3.0.0-beta2.patch1 / PhysX 5"
+
 
 def build_actor():
     layers = []
@@ -95,7 +97,9 @@ def make_cfg():
         cfg.events.add_base_mass = None
         cfg.events.base_com = None
     cfg.events.reset_base.params["pose_range"] = {
-        "x": (0.0, 0.0), "y": (0.0, 0.0), "yaw": (0.0, 0.0)
+        "x": (0.0, 0.0),
+        "y": (0.0, 0.0),
+        "yaw": (0.0, 0.0),
     }
     cfg.events.reset_base.params["velocity_range"] = {
         axis: (0.0, 0.0) for axis in ("x", "y", "z", "roll", "pitch", "yaw")
@@ -113,8 +117,11 @@ def make_cfg():
         # A long top deck keeps the final part of the PPT shot clean.
         cfg.scene.stair_top.spawn.size = (2.2, 1.20, 0.10)
         cfg.scene.stair_top.init_state.pos = (2.45, 0.0, 0.05)
-        cfg.viewer.eye = (2.7, -2.5, 1.25)
-        cfg.viewer.lookat = (1.05, 0.0, 0.22)
+        # A near side view makes the 20-mm stair profile and foot clearance
+        # readable in a 16:9 lecture slide while keeping the complete course
+        # inside the frame.
+        cfg.viewer.eye = (1.05, -2.00, 0.72)
+        cfg.viewer.lookat = (1.05, 0.0, 0.20)
         cfg.viewer.origin_type = "world"
     return cfg
 
@@ -122,98 +129,101 @@ def make_cfg():
 def main():
     if args_cli.video and len(args_cli.ckpt) != 1:
         raise ValueError("--video accepts exactly one --ckpt path")
-    cfg = make_cfg()
-    render_mode = "rgb_array" if args_cli.video else None
-    task = (
-        "Isaac-Velocity-Native-Robust-TinyMal-v0"
-        if args_cli.robust
-        else "Isaac-Velocity-Native-Stairs-TinyMal-v0"
-    )
-    env = gym.make(task, cfg=cfg, render_mode=render_mode)
-    if args_cli.video:
-        os.makedirs(args_cli.video_dir, exist_ok=True)
-        env = gym.wrappers.RecordVideo(
-            env,
-            video_folder=os.path.abspath(args_cli.video_dir),
-            step_trigger=lambda step: step == 0,
-            video_length=args_cli.steps,
-            name_prefix=args_cli.video_prefix,
-            disable_logger=True,
-        )
-
-    device = env.unwrapped.device
-    num_envs = env.unwrapped.num_envs
     results = []
     for checkpoint in args_cli.ckpt:
         checkpoint = os.path.abspath(checkpoint)
-        actor = load_actor(checkpoint, device)
-        obs, _ = env.reset()
-        command = env.unwrapped.command_manager.get_command("base_velocity")
-        command[:, 0] = args_cli.vx
-        command[:, 1:] = 0.0
-
-        reached = torch.zeros(num_envs, dtype=torch.bool, device=device)
-        first_attempt_reached = torch.zeros(num_envs, dtype=torch.bool, device=device)
-        reset_seen = torch.zeros(num_envs, dtype=torch.bool, device=device)
-        reach_step = torch.full((num_envs,), -1, dtype=torch.long, device=device)
-        reset_counts = torch.zeros(num_envs, dtype=torch.long, device=device)
-        max_local_x = torch.full((num_envs,), -1.0e9, device=device)
-        max_local_height = torch.full((num_envs,), -1.0e9, device=device)
-
-        # Isaac Lab performs in-place state writes during automatic resets.
-        # ``inference_mode`` would permanently mark those buffers as inference
-        # tensors and make the next checkpoint's explicit reset illegal.
-        with torch.no_grad():
-            for step in range(args_cli.steps):
-                command[:] = torch.tensor((args_cli.vx, 0.0, 0.0), device=device)
-                actions = actor(obs["policy"])
-                obs, _, terminated, _, _ = env.step(actions)
-                robot = env.unwrapped.scene["robot"].data
-                local_pos = robot.root_pos_w - env.unwrapped.scene.env_origins
-                max_local_x = torch.maximum(max_local_x, local_pos[:, 0])
-                max_local_height = torch.maximum(max_local_height, local_pos[:, 2])
-                just_reached = (~reached) & (local_pos[:, 0] >= 1.55)
-                reach_step[just_reached] = step
-                reached |= just_reached
-                first_attempt_reached |= just_reached & (~reset_seen)
-                reset_seen |= terminated
-                reset_counts += terminated.to(dtype=torch.long)
-
-        results.append(
-            {
-                "backend": "Isaac Sim / Isaac Lab / PhysX 5",
-                "checkpoint": checkpoint,
-                "seed": args_cli.seed,
-                "num_envs": num_envs,
-                "command_vx_mps": args_cli.vx,
-                "step_height_m": 0.02,
-                "num_steps": 5,
-                "robust_randomization": args_cli.robust,
-                "successes": int(reached.sum().item()),
-                "success_rate": float(reached.float().mean().item()),
-                "first_attempt_successes": int(first_attempt_reached.sum().item()),
-                "first_attempt_success_rate": float(
-                    first_attempt_reached.float().mean().item()
-                ),
-                "clean_rollout_successes": int(
-                    (reached & (~reset_seen)).sum().item()
-                ),
-                "clean_rollout_success_rate": float(
-                    (reached & (~reset_seen)).float().mean().item()
-                ),
-                "mean_time_to_top_s": (
-                    float(reach_step[reached].float().mean().item() * 0.02)
-                    if reached.any()
-                    else None
-                ),
-                "resets_total": int(reset_counts.sum().item()),
-                "envs_with_resets": int(reset_seen.sum().item()),
-                "max_local_x_mean_m": float(max_local_x.mean().item()),
-                "max_base_height_mean_m": float(max_local_height.mean().item()),
-                "video_dir": os.path.abspath(args_cli.video_dir) if args_cli.video else None,
-            }
+        # A fresh environment rewinds every randomization/noise/push stream,
+        # giving all checkpoints exactly the same seeded stair trial.
+        render_mode = "rgb_array" if args_cli.video else None
+        task = (
+            "Isaac-Velocity-Native-Robust-TinyMal-v0"
+            if args_cli.robust
+            else "Isaac-Velocity-Native-Stairs-TinyMal-v0"
         )
-        del actor
+        env = gym.make(task, cfg=make_cfg(), render_mode=render_mode)
+        if args_cli.video:
+            os.makedirs(args_cli.video_dir, exist_ok=True)
+            env = gym.wrappers.RecordVideo(
+                env,
+                video_folder=os.path.abspath(args_cli.video_dir),
+                step_trigger=lambda step: step == 0,
+                video_length=args_cli.steps,
+                name_prefix=args_cli.video_prefix,
+                disable_logger=True,
+            )
+        try:
+            device = env.unwrapped.device
+            num_envs = env.unwrapped.num_envs
+            actor = load_actor(checkpoint, device)
+            obs, _ = env.reset()
+            command = env.unwrapped.command_manager.get_command("base_velocity")
+            command[:, 0] = args_cli.vx
+            command[:, 1:] = 0.0
+
+            reached = torch.zeros(num_envs, dtype=torch.bool, device=device)
+            first_attempt_reached = torch.zeros(
+                num_envs, dtype=torch.bool, device=device
+            )
+            reset_seen = torch.zeros(num_envs, dtype=torch.bool, device=device)
+            reach_step = torch.full((num_envs,), -1, dtype=torch.long, device=device)
+            reset_counts = torch.zeros(num_envs, dtype=torch.long, device=device)
+            max_local_x = torch.full((num_envs,), -1.0e9, device=device)
+            max_local_height = torch.full((num_envs,), -1.0e9, device=device)
+
+            with torch.no_grad():
+                for step in range(args_cli.steps):
+                    command[:] = torch.tensor((args_cli.vx, 0.0, 0.0), device=device)
+                    actions = actor(obs["policy"])
+                    obs, _, terminated, _, _ = env.step(actions)
+                    robot = env.unwrapped.scene["robot"].data
+                    local_pos = robot.root_pos_w.torch - env.unwrapped.scene.env_origins
+                    max_local_x = torch.maximum(max_local_x, local_pos[:, 0])
+                    max_local_height = torch.maximum(max_local_height, local_pos[:, 2])
+                    just_reached = (~reached) & (local_pos[:, 0] >= 1.55)
+                    reach_step[just_reached] = step
+                    reached |= just_reached
+                    first_attempt_reached |= just_reached & (~reset_seen)
+                    reset_seen |= terminated
+                    reset_counts += terminated.to(dtype=torch.long)
+
+            results.append(
+                {
+                    "backend": BACKEND,
+                    "checkpoint": checkpoint,
+                    "seed": args_cli.seed,
+                    "num_envs": num_envs,
+                    "command_vx_mps": args_cli.vx,
+                    "step_height_m": 0.02,
+                    "num_steps": 5,
+                    "robust_randomization": args_cli.robust,
+                    "successes": int(reached.sum().item()),
+                    "success_rate": float(reached.float().mean().item()),
+                    "first_attempt_successes": int(first_attempt_reached.sum().item()),
+                    "first_attempt_success_rate": float(
+                        first_attempt_reached.float().mean().item()
+                    ),
+                    "clean_rollout_successes": int(
+                        (reached & (~reset_seen)).sum().item()
+                    ),
+                    "clean_rollout_success_rate": float(
+                        (reached & (~reset_seen)).float().mean().item()
+                    ),
+                    "mean_time_to_top_s": (
+                        float(reach_step[reached].float().mean().item() * 0.02)
+                        if reached.any()
+                        else None
+                    ),
+                    "resets_total": int(reset_counts.sum().item()),
+                    "envs_with_resets": int(reset_seen.sum().item()),
+                    "max_local_x_mean_m": float(max_local_x.mean().item()),
+                    "max_base_height_mean_m": float(max_local_height.mean().item()),
+                    "video_dir": (
+                        os.path.abspath(args_cli.video_dir) if args_cli.video else None
+                    ),
+                }
+            )
+        finally:
+            env.close()
 
     if len(results) == 1:
         result = results[0]
@@ -225,11 +235,13 @@ def main():
                 -item["first_attempt_success_rate"],
                 -item["success_rate"],
                 item["resets_total"],
-                item["mean_time_to_top_s"] if item["mean_time_to_top_s"] is not None else 1.0e9,
+                item["mean_time_to_top_s"]
+                if item["mean_time_to_top_s"] is not None
+                else 1.0e9,
             ),
         )
         result = {
-            "backend": "Isaac Sim / Isaac Lab / PhysX 5",
+            "backend": BACKEND,
             "best_checkpoint": ranked[0]["checkpoint"],
             "ranking": [item["checkpoint"] for item in ranked],
             "results": results,
@@ -240,7 +252,6 @@ def main():
         json.dump(result, stream, indent=2, sort_keys=True)
         stream.write("\n")
     print(json.dumps(result, indent=2, sort_keys=True))
-    env.close()
 
 
 if __name__ == "__main__":

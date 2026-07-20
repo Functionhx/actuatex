@@ -132,12 +132,11 @@ class TinymalNativeForwardEnvCfg(TinymalFlatEnvCfg):
 
     def __post_init__(self):
         super().__post_init__()
-        self.scene.robot.spawn.replace_cylinders_with_capsules = True
         actuator = self.scene.robot.actuators["all_dofs"]
         actuator.armature = 0.01
         actuator.friction = 0.05
-        self.sim.physx.solver_type = 1
-        self.sim.physx.enable_external_forces_every_iteration = True
+        self.sim.physics.solver_type = 1
+        self.sim.physics.enable_external_forces_every_iteration = True
         self.scene.robot.spawn.rigid_props.solver_position_iteration_count = 4
         self.scene.robot.spawn.rigid_props.solver_velocity_iteration_count = 1
         self.observations.policy.enable_corruption = False

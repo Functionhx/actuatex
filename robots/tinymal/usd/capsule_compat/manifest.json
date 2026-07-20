@@ -1,0 +1,29 @@
+{
+  "format_version": 1,
+  "source": {
+    "path": "../../urdf/tinymal.urdf",
+    "sha256": "4d6ede0acbe77620def8cd09e7d8140ab423f9794b109fd83620fb2b205f3287"
+  },
+  "generator": {
+    "isaac_sim": "5.1.0",
+    "urdf_importer": "2.4.30",
+    "replace_cylinders_with_capsules": true,
+    "make_instanceable": true
+  },
+  "validation": {
+    "capsule_count": 4,
+    "cylinder_count": 0,
+    "capsule_radius_m": 0.03,
+    "capsule_height_m": 0.03,
+    "capsule_axis": "Z",
+    "collision_api": true,
+    "absolute_external_references": 0
+  },
+  "files": {
+    "tinymal.usd": "9c7f47b49cfd48de2435dea48a1eb30ffbef33f961d74e6914221b6c3f306285",
+    "configuration/tinymal_base.usd": "efbab3ddec190015eb7812aa76931f396e457d7da2f2e8f37c4c0a79a8b7c5d5",
+    "configuration/tinymal_physics.usd": "ec544a3403588238fed4963833f7bc32e90be1fbe9250a96d5471efd694acc79",
+    "configuration/tinymal_robot.usd": "ce4c9f8c7711b95a97e4ca163c21a660808aa3325e36db71401c6ab89d47841e",
+    "configuration/tinymal_sensor.usd": "4438536e90c16a710db99e96ca1a0d86f0bc272edad931ff1e1a2a61c521999f"
+  }
+}

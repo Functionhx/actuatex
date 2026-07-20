@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ActuateX Sentinel 11-DOF wheel-legged teaching robot.
+
+  Original primitive-geometry asset; no RoboMaster or third-party CAD is
+  redistributed. Coordinate convention: x forward, y left, z up. Joint order
+  is mapped by name through tasks.robomaster.contract because serial-tree
+  declaration order is not policy order. Dimensions and inertias are mirrored
+  by ../mjcf/actuatex_sentinel.xml.
+-->
+<robot name="actuatex_sentinel">
+  <material name="actuatex_orange"><color rgba="1.0 0.30 0.04 1.0"/></material>
+  <material name="graphite"><color rgba="0.075 0.085 0.10 1.0"/></material>
+  <material name="metal"><color rgba="0.48 0.53 0.58 1.0"/></material>
+  <material name="sensor_black"><color rgba="0.015 0.02 0.025 1.0"/></material>
+  <material name="armor_blue"><color rgba="0.04 0.34 0.96 0.82"/></material>
+
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="10.5"/>
+      <inertia ixx="0.14875" ixy="0" ixz="0"
+               iyy="0.22400" iyz="0" izz="0.32830"/>
+    </inertial>
+    <visual>
+      <geometry><box size="0.48 0.38 0.16"/></geometry>
+      <material name="graphite"/>
+    </visual>
+    <visual>
+      <origin xyz="0.02 0 0.086" rpy="0 0 0"/>
+      <geometry><box size="0.30 0.26 0.012"/></geometry>
+      <material name="actuatex_orange"/>
+    </visual>
+    <collision><geometry><box size="0.48 0.38 0.16"/></geometry></collision>
+  </link>
+
+  <link name="left_upper_link">
+    <inertial>
+      <origin xyz="0 0 -0.075" rpy="0 0 0"/>
+      <mass value="0.16"/>
+      <inertia ixx="0.000327" ixy="0" ixz="0"
+               iyy="0.000321" iyz="0" izz="0.000048"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.075" rpy="0 0 0"/>
+      <geometry><box size="0.040 0.045 0.150"/></geometry>
+      <material name="actuatex_orange"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.075" rpy="0 0 0"/>
+      <geometry><box size="0.040 0.045 0.150"/></geometry>
+    </collision>
+  </link>
+  <joint name="left_hip_joint" type="revolute">
+    <origin xyz="0 0.22 -0.04" rpy="0 0 0"/>
+    <parent link="base_link"/><child link="left_upper_link"/>
+    <axis xyz="0 1 0"/><dynamics damping="0" friction="0"/>
+    <limit lower="-1.0" upper="1.0" effort="30" velocity="20"/>
+  </joint>
+
+  <link name="left_lower_link">
+    <inertial>
+      <origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <mass value="0.36"/>
+      <inertia ixx="0.001923" ixy="0" ixz="0"
+               iyy="0.001923" iyz="0" izz="0.000096"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><box size="0.040 0.040 0.250"/></geometry>
+      <material name="metal"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><box size="0.040 0.040 0.250"/></geometry>
+    </collision>
+  </link>
+  <joint name="left_knee_joint" type="revolute">
+    <origin xyz="0 0 -0.15" rpy="0 0 0"/>
+    <parent link="left_upper_link"/><child link="left_lower_link"/>
+    <axis xyz="0 1 0"/><dynamics damping="0" friction="0"/>
+    <limit lower="-1.5" upper="0.2" effort="30" velocity="20"/>
+  </joint>
+
+  <link name="left_wheel_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1.22"/>
+      <inertia ixx="0.002082" ixy="0" ixz="0"
+               iyy="0.003431" iyz="0" izz="0.002082"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+      <geometry><cylinder radius="0.075" length="0.060"/></geometry>
+      <material name="graphite"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+      <geometry><cylinder radius="0.075" length="0.060"/></geometry>
+    </collision>
+  </link>
+  <joint name="left_wheel_joint" type="continuous">
+    <origin xyz="0 0 -0.25" rpy="0 0 0"/>
+    <parent link="left_lower_link"/><child link="left_wheel_link"/>
+    <axis xyz="0 1 0"/><dynamics damping="0" friction="0"/>
+    <limit effort="12" velocity="50"/>
+  </joint>
+
+  <link name="right_upper_link">
+    <inertial>
+      <origin xyz="0 0 -0.075" rpy="0 0 0"/>
+      <mass value="0.16"/>
+      <inertia ixx="0.000327" ixy="0" ixz="0"
+               iyy="0.000321" iyz="0" izz="0.000048"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.075" rpy="0 0 0"/>
+      <geometry><box size="0.040 0.045 0.150"/></geometry>
+      <material name="actuatex_orange"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.075" rpy="0 0 0"/>
+      <geometry><box size="0.040 0.045 0.150"/></geometry>
+    </collision>
+  </link>
+  <joint name="right_hip_joint" type="revolute">
+    <origin xyz="0 -0.22 -0.04" rpy="0 0 0"/>
+    <parent link="base_link"/><child link="right_upper_link"/>
+    <axis xyz="0 1 0"/><dynamics damping="0" friction="0"/>
+    <limit lower="-1.0" upper="1.0" effort="30" velocity="20"/>
+  </joint>
+
+  <link name="right_lower_link">
+    <inertial>
+      <origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <mass value="0.36"/>
+      <inertia ixx="0.001923" ixy="0" ixz="0"
+               iyy="0.001923" iyz="0" izz="0.000096"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><box size="0.040 0.040 0.250"/></geometry>
+      <material name="metal"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.125" rpy="0 0 0"/>
+      <geometry><box size="0.040 0.040 0.250"/></geometry>
+    </collision>
+  </link>
+  <joint name="right_knee_joint" type="revolute">
+    <origin xyz="0 0 -0.15" rpy="0 0 0"/>
+    <parent link="right_upper_link"/><child link="right_lower_link"/>
+    <axis xyz="0 1 0"/><dynamics damping="0" friction="0"/>
+    <limit lower="-1.5" upper="0.2" effort="30" velocity="20"/>
+  </joint>
+
+  <link name="right_wheel_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1.22"/>
+      <inertia ixx="0.002082" ixy="0" ixz="0"
+               iyy="0.003431" iyz="0" izz="0.002082"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+      <geometry><cylinder radius="0.075" length="0.060"/></geometry>
+      <material name="graphite"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+      <geometry><cylinder radius="0.075" length="0.060"/></geometry>
+    </collision>
+  </link>
+  <joint name="right_wheel_joint" type="continuous">
+    <origin xyz="0 0 -0.25" rpy="0 0 0"/>
+    <parent link="right_lower_link"/><child link="right_wheel_link"/>
+    <axis xyz="0 1 0"/><dynamics damping="0" friction="0"/>
+    <limit effort="12" velocity="50"/>
+  </joint>
+
+  <link name="gimbal_yaw_carrier">
+    <inertial>
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <mass value="0.85"/>
+      <inertia ixx="0.001842" ixy="0" ixz="0"
+               iyy="0.002748" iyz="0" izz="0.003683"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <geometry><box size="0.18 0.14 0.08"/></geometry>
+      <material name="metal"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <geometry><box size="0.18 0.14 0.08"/></geometry>
+    </collision>
+  </link>
+  <joint name="gimbal_yaw_joint" type="revolute">
+    <origin xyz="0.03 0 0.10" rpy="0 0 0"/>
+    <parent link="base_link"/><child link="gimbal_yaw_carrier"/>
+    <axis xyz="0 0 1"/><dynamics damping="0" friction="0"/>
+    <limit lower="-3.14159265359" upper="3.14159265359" effort="2" velocity="12"/>
+  </joint>
+
+  <link name="gimbal_pitch_assembly">
+    <inertial>
+      <origin xyz="0.13 0 0" rpy="0 0 0"/>
+      <mass value="0.75"/>
+      <inertia ixx="0.001025" ixy="0" ixz="0"
+               iyy="0.006025" iyz="0" izz="0.006250"/>
+    </inertial>
+    <visual>
+      <origin xyz="0.13 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.30 0.10 0.08"/></geometry>
+      <material name="graphite"/>
+    </visual>
+    <visual>
+      <origin xyz="0.30 0 0" rpy="0 1.57079632679 0"/>
+      <geometry><cylinder radius="0.014" length="0.16"/></geometry>
+      <material name="metal"/>
+    </visual>
+    <collision>
+      <origin xyz="0.13 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.30 0.10 0.08"/></geometry>
+    </collision>
+  </link>
+  <joint name="gimbal_pitch_joint" type="revolute">
+    <origin xyz="0.03 0 0.12" rpy="0 0 0"/>
+    <parent link="gimbal_yaw_carrier"/><child link="gimbal_pitch_assembly"/>
+    <axis xyz="0 1 0"/><dynamics damping="0" friction="0"/>
+    <limit lower="-0.35" upper="0.55" effort="2" velocity="12"/>
+  </joint>
+
+  <link name="left_flywheel_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.12"/>
+      <inertia ixx="0.000031" ixy="0" ixz="0"
+               iyy="0.000061" iyz="0" izz="0.000031"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+      <geometry><cylinder radius="0.030" length="0.020"/></geometry>
+      <material name="actuatex_orange"/>
+    </visual>
+  </link>
+  <joint name="left_flywheel_joint" type="continuous">
+    <origin xyz="0.15 0.052 0" rpy="0 0 0"/>
+    <parent link="gimbal_pitch_assembly"/><child link="left_flywheel_link"/>
+    <axis xyz="0 1 0"/><dynamics damping="0" friction="0"/>
+    <limit effort="0.45" velocity="1200"/>
+  </joint>
+
+  <link name="right_flywheel_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.12"/>
+      <inertia ixx="0.000031" ixy="0" ixz="0"
+               iyy="0.000061" iyz="0" izz="0.000031"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+      <geometry><cylinder radius="0.030" length="0.020"/></geometry>
+      <material name="actuatex_orange"/>
+    </visual>
+  </link>
+  <joint name="right_flywheel_joint" type="continuous">
+    <origin xyz="0.15 -0.052 0" rpy="0 0 0"/>
+    <parent link="gimbal_pitch_assembly"/><child link="right_flywheel_link"/>
+    <axis xyz="0 1 0"/><dynamics damping="0" friction="0"/>
+    <limit effort="0.45" velocity="1200"/>
+  </joint>
+
+  <link name="feeder_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.18"/>
+      <inertia ixx="0.000055" ixy="0" ixz="0"
+               iyy="0.000083" iyz="0" izz="0.000055"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+      <geometry><cylinder radius="0.030" length="0.030"/></geometry>
+      <material name="metal"/>
+    </visual>
+  </link>
+  <joint name="feeder_joint" type="continuous">
+    <origin xyz="-0.04 0 0" rpy="0 0 0"/>
+    <parent link="gimbal_pitch_assembly"/><child link="feeder_link"/>
+    <axis xyz="0 1 0"/><dynamics damping="0" friction="0"/>
+    <limit effort="5" velocity="8"/>
+  </joint>
+
+  <link name="mid360_link">
+    <inertial>
+      <origin xyz="0 0 0.030" rpy="0 0 0"/><mass value="0.265"/>
+      <inertia ixx="0.00023" ixy="0" ixz="0"
+               iyy="0.00023" iyz="0" izz="0.00018"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.030" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.040" length="0.060"/></geometry>
+      <material name="sensor_black"/>
+    </visual>
+  </link>
+  <joint name="mid360_fixed" type="fixed">
+    <origin xyz="-0.14 0 0.09" rpy="0 0 0"/>
+    <parent link="base_link"/><child link="mid360_link"/>
+  </joint>
+
+  <link name="camera_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/><mass value="0.15"/>
+      <inertia ixx="0.000040" ixy="0" ixz="0"
+               iyy="0.000065" iyz="0" izz="0.000075"/>
+    </inertial>
+    <visual>
+      <geometry><box size="0.045 0.075 0.045"/></geometry>
+      <material name="sensor_black"/>
+    </visual>
+  </link>
+  <joint name="camera_fixed" type="fixed">
+    <origin xyz="0.19 0 0.065" rpy="0 0 0"/>
+    <parent link="gimbal_pitch_assembly"/><child link="camera_link"/>
+  </joint>
+
+  <link name="front_armor_link">
+    <inertial><origin xyz="0 0 0" rpy="0 0 0"/><mass value="0.15"/>
+      <inertia ixx="0.00020" ixy="0" ixz="0" iyy="0.00038" iyz="0" izz="0.00058"/></inertial>
+    <visual><geometry><box size="0.012 0.28 0.10"/></geometry><material name="armor_blue"/></visual>
+    <collision><geometry><box size="0.012 0.28 0.10"/></geometry></collision>
+  </link>
+  <joint name="front_armor_fixed" type="fixed">
+    <origin xyz="0.246 0 0" rpy="0 0 0"/><parent link="base_link"/><child link="front_armor_link"/>
+  </joint>
+
+  <link name="rear_armor_link">
+    <inertial><origin xyz="0 0 0" rpy="0 0 0"/><mass value="0.15"/>
+      <inertia ixx="0.00020" ixy="0" ixz="0" iyy="0.00038" iyz="0" izz="0.00058"/></inertial>
+    <visual><geometry><box size="0.012 0.28 0.10"/></geometry><material name="armor_blue"/></visual>
+    <collision><geometry><box size="0.012 0.28 0.10"/></geometry></collision>
+  </link>
+  <joint name="rear_armor_fixed" type="fixed">
+    <origin xyz="-0.246 0 0" rpy="0 0 0"/><parent link="base_link"/><child link="rear_armor_link"/>
+  </joint>
+
+  <link name="left_armor_link">
+    <inertial><origin xyz="0 0 0" rpy="0 0 0"/><mass value="0.15"/>
+      <inertia ixx="0.00038" ixy="0" ixz="0" iyy="0.00020" iyz="0" izz="0.00058"/></inertial>
+    <visual><geometry><box size="0.28 0.012 0.10"/></geometry><material name="armor_blue"/></visual>
+    <collision><geometry><box size="0.28 0.012 0.10"/></geometry></collision>
+  </link>
+  <joint name="left_armor_fixed" type="fixed">
+    <origin xyz="0 0.196 0" rpy="0 0 0"/><parent link="base_link"/><child link="left_armor_link"/>
+  </joint>
+
+  <link name="right_armor_link">
+    <inertial><origin xyz="0 0 0" rpy="0 0 0"/><mass value="0.15"/>
+      <inertia ixx="0.00038" ixy="0" ixz="0" iyy="0.00020" iyz="0" izz="0.00058"/></inertial>
+    <visual><geometry><box size="0.28 0.012 0.10"/></geometry><material name="armor_blue"/></visual>
+    <collision><geometry><box size="0.28 0.012 0.10"/></geometry></collision>
+  </link>
+  <joint name="right_armor_fixed" type="fixed">
+    <origin xyz="0 -0.196 0" rpy="0 0 0"/><parent link="base_link"/><child link="right_armor_link"/>
+  </joint>
+</robot>

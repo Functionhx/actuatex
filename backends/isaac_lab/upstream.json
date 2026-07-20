@@ -1,8 +1,23 @@
 {
+  "isaac_sim": {
+    "release": "6.0.1 GA",
+    "tag": "v6.0.1",
+    "commit": "045ca8b59622b99a408092124377c66346e8d9c2",
+    "linux_archive": "isaac-sim-standalone-6.0.1-linux-x86_64.zip",
+    "download_url": "https://downloads.isaacsim.nvidia.com/isaac-sim-standalone-6.0.1-linux-x86_64.zip",
+    "md5": "65e2c2e83e2461ce0f33b0732d0ee4a3"
+  },
   "isaac_lab": {
     "url": "https://github.com/isaac-sim/IsaacLab.git",
-    "commit": "b4c321024792976150ca55fddb26fa34480d974e"
+    "tag": "v3.0.0-beta2.patch1",
+    "commit": "ffff603eafc6b74264a5261cc0183d6a65390d78",
+    "release_status": "beta"
   },
-  "tested_isaac_sim": "5.1.0-rc.19",
-  "note": "Isaac Sim binaries are installed separately and are never vendored here."
+  "python": "3.12",
+  "pytorch": "2.10.0",
+  "torchvision": "0.25.0",
+  "torchaudio": "2.10.0",
+  "rsl_rl": "5.0.1",
+  "validation_status": "runtime, training, evaluation, ROS writer, RTX sensor, and bidirectional sim2sim validation complete on 2026-07-19",
+  "note": "The official 6.0.1 GA Linux ZIP was verified with the published MD5 and installed externally. Its bundled VERSION string is 6.0.1-rc.7+release.42383.32955d8d.gl; this internal build identifier does not replace the verified GA archive identity. The old 5.1 compatibility patch is retained only for historical reproduction and must not be applied to 6.0.1."
 }
